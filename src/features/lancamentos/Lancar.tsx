@@ -53,7 +53,7 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
     setCategoriaId(null)
   }
 
-  /** Setas andam na grade de 4 colunas; sem seleção, começa da primeira. */
+  /** ← → andam na fileira de categorias; sem seleção, começa da primeira. */
   function moverCategoria(passo: number) {
     if (visiveis.length === 0) return
     const atual = visiveis.findIndex((c) => c.id === categoriaId)
@@ -74,8 +74,6 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
       e: () => trocarEspecie('income'),
       ArrowRight: () => moverCategoria(1),
       ArrowLeft: () => moverCategoria(-1),
-      ArrowDown: () => moverCategoria(4),
-      ArrowUp: () => moverCategoria(-4),
       d: () => refDescricao.current?.focus(),
     },
     { mesmoDigitando: ['Enter'] },
@@ -140,18 +138,21 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
         {/* valor herói: mono, grande, à direita como numa calculadora */}
         <div className="flex items-baseline justify-end gap-2 px-1 pb-2 pt-4" aria-live="polite">
           <span className="font-mono text-lg text-tenue">R$</span>
-          <span className={cx('font-mono text-5xl font-semibold tracking-tight tabular-nums transition-colors', corValor)}>
+          <span className={cx('font-mono text-4xl font-semibold tracking-tight tabular-nums transition-colors [@media(min-height:760px)]:text-5xl', corValor)}>
             {formatarSeco(centavos)}
           </span>
         </div>
       </div>
 
-      {/* grade de categorias: a única parte que rola */}
-      <div className="rolagem-fina min-h-0 flex-1 overflow-y-auto px-4 py-2">
+      {/* Categorias numa fileira que rola na horizontal, com ALTURA FIXA: em grade
+          ela era a única parte flexível e sumia em celular de tela baixa. */}
+      <div className="shrink-0 py-2">
         {visiveis.length === 0 ? (
-          <Vazio compacto icone="grid" titulo="Nenhuma categoria deste tipo ainda." descricao="Crie nas configurações do orçamento." />
+          <div className="px-4">
+            <Vazio compacto icone="grid" titulo="Nenhuma categoria deste tipo ainda." descricao="Crie nas configurações do orçamento." />
+          </div>
         ) : (
-          <div className="grid grid-cols-4 gap-2">
+          <div className="rolagem-fina flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-1">
             {visiveis.map((c) => {
               const sel = categoriaId === c.id
               return (
@@ -159,13 +160,14 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
                   key={c.id}
                   type="button"
                   aria-pressed={sel}
+                  ref={sel ? (el) => el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) : undefined}
                   onClick={() => {
                     vibrar('leve')
                     setCategoriaId(sel ? null : c.id)
                   }}
                   className={cx(
-                    'flex min-h-[4.75rem] flex-col items-center justify-center gap-1.5 rounded-card border px-1 py-2 text-[11px] leading-tight transition-[transform,background-color,border-color,color] duration-150 ease-suave active:scale-[0.95]',
-                    sel ? 'border-acento bg-tinta-acento text-texto' : 'border-transparent text-suave hover:bg-superficie-alta',
+                    'flex h-[4.75rem] w-[4.5rem] shrink-0 snap-start flex-col items-center justify-center gap-1.5 rounded-card border px-1 py-2 text-[11px] leading-tight transition-[transform,background-color,border-color,color] duration-150 ease-suave active:scale-[0.95]',
+                    sel ? 'border-acento bg-tinta-acento text-texto' : 'border-borda text-suave hover:bg-superficie-alta',
                   )}
                 >
                   <IconeCategoria categoria={c} tamanho="sm" />
@@ -176,6 +178,9 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
           </div>
         )}
       </div>
+
+      {/* espaço que sobra em tela alta fica aqui, não esticando a fileira */}
+      <div className="min-h-0 flex-1" />
 
       <div className="shrink-0 border-t border-borda">
         <div className="flex items-center gap-2 px-4 py-2.5">
@@ -215,7 +220,7 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
               type="button"
               onClick={() => tecla(t)}
               aria-label={t === '⌫' ? 'Apagar' : t}
-              className="flex h-14 items-center justify-center rounded-card bg-superficie-alta/60 font-mono text-2xl text-texto transition-[transform,background-color] duration-100 ease-suave active:scale-[0.95] active:bg-superficie-alta"
+              className="flex h-12 items-center justify-center rounded-card bg-superficie-alta/60 font-mono text-2xl [@media(min-height:760px)]:h-14 text-texto transition-[transform,background-color] duration-100 ease-suave active:scale-[0.95] active:bg-superficie-alta"
             >
               {t === '⌫' ? <Icone n="backspace" className="h-6 w-6 text-suave" /> : t}
             </button>

@@ -69,7 +69,7 @@ export const AJUDA_ATALHOS: { grupo: string; itens: [string, string][] }[] = [
       ['0–9', 'Digitar o valor'],
       ['⌫', 'Apagar dígito'],
       ['S  E', 'Saiu · Entrou'],
-      ['← → ↑ ↓', 'Escolher categoria'],
+      ['← →', 'Escolher categoria'],
       ['D', 'Ir pra descrição'],
       ['Enter', 'Lançar'],
     ],
