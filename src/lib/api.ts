@@ -42,16 +42,21 @@ async function requisitar<T>(metodo: string, caminho: string, corpo?: unknown): 
     body: corpo === undefined ? undefined : JSON.stringify(corpo),
   })
 
+  // Envelope da API: { status: 'success', data } | { status: 'error', detail }
   const texto = await resposta.text()
-  const dados = texto ? JSON.parse(texto) : null
+  const envelope = (texto ? JSON.parse(texto) : null) as
+    | { status: 'success'; data: T }
+    | { status: 'error'; detail: string }
+    | null
 
-  if (!resposta.ok) {
+  if (!resposta.ok || envelope?.status !== 'success') {
     // Sessão morreu no meio do uso (expirou, saiu em outro aparelho): volta pro login.
     // /auth/eu fica de fora porque é ele que descobre se tem sessão.
     if (resposta.status === 401 && caminho !== '/auth/eu') avisarSessao(null)
-    throw new ErroApi((dados as { erro?: string } | null)?.erro ?? `Erro ${resposta.status}`, resposta.status)
+    const detalhe = envelope?.status === 'error' ? envelope.detail : `Erro ${resposta.status}`
+    throw new ErroApi(detalhe, resposta.status)
   }
-  return dados as T
+  return envelope.data
 }
 
 export const api = {

@@ -1,9 +1,9 @@
 # O que falta
 
-Orçamento conjunto: PWA (GitHub Pages) + API própria em Hono/Bun na VPS.
+Orçamento conjunto: PWA (GitHub Pages) + API própria (repo `orcamento-api`) na VPS.
 
 - front: `https://orcamento.jaopd.dev` (GitHub Pages, branch `gh-pages`)
-- API: `https://orcamento.api.jaopd.dev` → Caddy → `127.0.0.1:8001` → binário `orcamento-api`
+- API: `https://orcamento.api.jaopd.dev` → Caddy → `127.0.0.1:8001` (repo `orcamento-api`)
 - banco: Postgres `orcamento` na VPS, socket unix + peer auth (sem senha)
 - e-mail do código: Resend, domínio `orcamento.jaopd.dev`
 
@@ -11,20 +11,13 @@ Orçamento conjunto: PWA (GitHub Pages) + API própria em Hono/Bun na VPS.
 
 ## 1. Rodar local
 
-```bash
-# API (precisa de um Postgres; o jeito fácil é o dos testes)
-cd api
-./testes/rodar.sh                 # 35 testes de integração contra Postgres 17 no Docker
-DATABASE_URL=postgres://... ORIGEM=http://localhost:5173 \
-  EMAILS_PERMITIDOS=voce@x.com bun --hot src/index.ts
+A API mora no repo **`orcamento-api`** (Hono + Bun + Prisma). Suba ela primeiro;
+o README de lá diz como.
 
-# front
+```bash
 cp .env.example .env              # VITE_API_URL=http://localhost:8001
 pnpm dev
 ```
-
-Sem `RESEND_API_KEY` o pedido de código falha com 502 — em dev, olhe o código
-direto no banco não dá (só o hash é gravado); use uma chave de teste do Resend.
 
 ## 2. Verificar antes de confiar
 
@@ -32,35 +25,11 @@ direto no banco não dá (só o hash é gravado); use uma chave de teste do Rese
 pnpm verificar          # data/fuso, dinheiro em centavos, CSV
 pnpm fumaca             # monta as 4 telas em jsdom com a rede stubada
 pnpm build              # tsc + vite + service worker
-cd api && ./testes/rodar.sh
 ```
 
-O que os testes da API cobrem: estranho recebe 404 em todo endpoint de orçamento
-alheio; convite de uso único, com validade e aceite idempotente; fila idempotente
-e autoria vinda da sessão; código de login de uso único e morto após 5 chutes;
-sessão expirada; CSRF (Origin + JSON obrigatórios nas escritas).
+A segurança (quem enxerga qual orçamento) é testada no `orcamento-api`.
 
-## 3. Deploy da API
-
-```bash
-cd api
-bun build --compile --target=bun-linux-x64 src/index.ts --outfile dist/orcamento-api
-scp dist/orcamento-api jaopd:~/
-```
-
-Um binário só (~110 MB, com o runtime do Bun dentro), sem Node nem Bun na VPS.
-Na VPS, como root:
-
-```bash
-install -m 755 /home/jaopd/orcamento-api /srv/orcamento/orcamento-api
-sudo -u orcamento /srv/orcamento/orcamento-api migrar
-systemctl restart orcamento
-```
-
-Unit: `/etc/systemd/system/orcamento.service`. Segredos: `/etc/orcamento/env`
-(`RESEND_API_KEY`, `EMAILS_PERMITIDOS`, `ORIGEM`, `PORT`).
-
-## 4. Deploy do front
+## 3. Deploy do front
 
 ```bash
 pnpm deploy   # build + gh-pages -d dist
@@ -70,7 +39,7 @@ O `public/CNAME` já leva `orcamento.jaopd.dev`.
 
 ---
 
-## 5. O que ainda não existe
+## 4. O que ainda não existe
 
 ### Precisa fazer
 
@@ -95,7 +64,7 @@ O `public/CNAME` já leva `orcamento.jaopd.dev`.
 
 ---
 
-## 6. Mapa rápido do código
+## 5. Mapa rápido do código
 
 ```
 src/lib/
@@ -106,11 +75,4 @@ src/lib/
   uuidv7.ts     id gerado no cliente, ordenável no tempo
   csv.ts        export; separador ';' porque a vírgula é o decimal
 src/features/   auth, orcamentos, lancamentos, mes
-api/
-  src/app.ts        Hono: CORS, CSRF, rotas
-  src/auth.ts       código por e-mail, sessão em cookie HttpOnly (só o hash no banco)
-  src/rotas/        orçamentos (com exigeMembro), lançamentos, convites
-  src/migrar.ts     aplica migrations/ (embutidas no binário)
-  migrations/       0001 schema, 0002 funções (criar orçamento, convite)
-  testes/           rodar.sh + api.test.ts
 ```

@@ -38,10 +38,10 @@ g.requestAnimationFrame = (cb: FrameRequestCallback) =>
 g.cancelAnimationFrame = (id: number) => clearTimeout(id)
 g.IS_REACT_ACT_ENVIRONMENT = true
 
-// A API devolve lista vazia pra tudo: é o estado mais hostil às telas.
-// Response nativo do Node (não o do jsdom).
+// A API devolve lista vazia pra tudo, no envelope { status, data }: é o estado
+// mais hostil às telas. Response nativo do Node (não o do jsdom).
 g.fetch = async () =>
-  new Response('[]', {
+  new Response(JSON.stringify({ status: 'success', data: [] }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   })
