@@ -37,6 +37,8 @@ export default defineConfig({
         // dados é a fila em src/lib/fila.ts, não o service worker.
         navigateFallback: 'index.html',
         runtimeCaching: [],
+        // Push (F8): o SW gerado importa o handler escrito à mão em public/.
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

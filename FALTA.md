@@ -23,7 +23,7 @@ pnpm dev
 
 ```bash
 pnpm verificar          # data/fuso, dinheiro em centavos, CSV
-pnpm fumaca             # monta as 4 telas em jsdom com a rede stubada
+pnpm fumaca             # monta todas as telas em jsdom com a API devolvendo vazio
 pnpm build              # tsc + vite + service worker
 ```
 
@@ -49,17 +49,16 @@ O `public/CNAME` já leva `orcamento.jaopd.dev`.
 | **Instalar a PWA nos dois aparelhos** | E confirmar o login por código **com o app na tela inicial**. |
 | **Teste de modo avião** | Lançar 3 gastos sem rede, matar o app, reabrir, religar. Os 3 sobem, nenhum duplica. O app abre offline com a última identidade em cache (`orcamento:usuario`). |
 | **Backup do banco** | Adiado de propósito. Antes de ter dado de verdade, `pg_dump` diário pra fora da VPS. |
+| **Chaves VAPID na VPS** | Sem `VAPID_PUBLICA`/`VAPID_PRIVADA`/`VAPID_CONTATO` em `/etc/orcamento/env` o aviso de meta não sai. Gerar com `bunx web-push generate-vapid-keys`. |
+| **Ver os gráficos a olho** | Análises (recharts) só foi testada em jsdom; claro e escuro não foram conferidos. |
+| **Limpar telas velhas** | `features/mes/Mes.tsx` e `features/orcamentos/Membros.tsx` não são mais usados pelo App (Dashboard, Metas e ConfigOrcamento substituíram). Mes.tsx ainda roda na fumaça. |
 
 ### Cortado de propósito (não é esquecimento)
 
 | O quê | Por que ficou fora |
 |---|---|
 | **Parcelamento de cartão** | Voltar é coluna `installment_group_id` + expandir em N linhas no cliente. |
-| **Realtime** | São duas pessoas. Reler ao ganhar foco é indistinguível na prática. |
-| **Editar lançamento** | Só apagar (soft delete) e lançar de novo. Estorno é linha negativa. |
-| **Editar offline** | A fila é só-INSERT: elimina o bug de reenvio tardio sobrescrever edição nova. |
-| **Categorias customizáveis** | As 13 semeadas resolvem o primeiro mês. |
-| **Gráficos** | Depois de um mês de uso real. |
+| **Editar offline** | A fila é só-INSERT: elimina o bug de reenvio tardio sobrescrever edição nova. Editar exige rede. |
 | **Dono/admin** | Todo membro pode tudo. `ledger_members.papel` é a evolução se precisar. |
 
 ---
@@ -74,5 +73,17 @@ src/lib/
   fila.ts       reenvio offline, só INSERT, idempotente pelo UUIDv7
   uuidv7.ts     id gerado no cliente, ordenável no tempo
   csv.ts        export; separador ';' porque a vírgula é o decimal
-src/features/   auth, orcamentos, lancamentos, mes
+  eventos.ts    SSE: relê a tela quando o outro membro muda algo
+src/features/
+  auth  orcamentos (seletor, config, convites, categorias)  lancamentos (lançar, editar)
+  mes (dashboard)  historico  metas  analises  acerto  recorrentes  busca  perfil
+  notificacoes (push.ts; public/push-sw.js mostra o aviso)
 ```
+
+## 6. O que existe agora
+
+- Realtime por SSE, histórico com autoria, edição de lançamento (online).
+- Categorias customizáveis (criar, editar, reordenar, arquivar).
+- Metas por categoria + meta de economia; análises com gráficos e escopo eu/membro/conjunto.
+- Acerto de contas com proporções; lançamentos recorrentes; busca; aviso de meta por push.
+- Perfil: nome, troca de e-mail, tema, sair dos outros aparelhos.

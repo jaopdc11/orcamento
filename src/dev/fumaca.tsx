@@ -61,6 +61,16 @@ const { Login } = await import('../features/auth/Login')
 const { Comecar } = await import('../features/orcamentos/Comecar')
 const { Mes } = await import('../features/mes/Mes')
 const { Lancar } = await import('../features/lancamentos/Lancar')
+const { Dashboard } = await import('../features/mes/Dashboard')
+const { Historico } = await import('../features/historico/Historico')
+const { ConfigOrcamento } = await import('../features/orcamentos/ConfigOrcamento')
+const { Seletor } = await import('../features/orcamentos/Seletor')
+const { Metas } = await import('../features/metas/Metas')
+const { Analises } = await import('../features/analises/Analises')
+const { Perfil } = await import('../features/perfil/Perfil')
+const { Acerto } = await import('../features/acerto/Acerto')
+const { Recorrentes } = await import('../features/recorrentes/Recorrentes')
+const { Busca } = await import('../features/busca/Busca')
 
 let falhas = 0
 
@@ -93,6 +103,14 @@ async function montar(nome: string, elemento: React.ReactElement, esperado: stri
 }
 
 const ORCAMENTO = { id: 'l1', nome: 'Nossa casa', created_at: '2026-01-01T00:00:00Z' }
+const MEMBRO = {
+  ledger_id: 'l1',
+  user_id: 'u1',
+  apelido: 'João',
+  nome: null,
+  email: 'joao@exemplo.dev',
+  proporcao: 1,
+}
 const CATEGORIAS = [
   {
     id: 'c1',
@@ -142,10 +160,64 @@ await montar(
   createElement(Mes, {
     orcamento: ORCAMENTO,
     categorias: CATEGORIAS,
-    membros: [{ ledger_id: 'l1', user_id: 'u1', apelido: 'João' }],
+    membros: [MEMBRO],
     aoFechar: () => {},
   }),
   ['Nada em', 'Lançamentos', 'Metas', 'exportar CSV'],
+)
+
+await montar(
+  'dashboard vazio não quebra',
+  createElement(Dashboard, {
+    ledgerId: 'l1',
+    categorias: CATEGORIAS,
+    usuarioId: 'u1',
+    ocultar: false,
+    membros: new Map([['u1', MEMBRO]]),
+  }),
+  ['Orçamento Mensal', 'Receitas', 'Despesas'],
+)
+
+// Telas v2: cada uma tem que montar com a API devolvendo vazio. O texto
+// esperado é o TÍTULO da tela — quem implementar mantém o título.
+const CTX = {
+  orcamento: ORCAMENTO,
+  usuarioId: 'u1',
+  membros: [MEMBRO],
+  categorias: CATEGORIAS,
+  ocultar: false,
+}
+const nada = () => {}
+await montar('histórico', createElement(Historico, CTX), ['Histórico'])
+await montar('busca', createElement(Busca, CTX), ['Busca'])
+await montar('metas', createElement(Metas, CTX), ['Metas'])
+await montar('análises', createElement(Analises, CTX), ['Análises'])
+await montar('acerto', createElement(Acerto, { ...CTX, aoMudar: nada }), ['Acerto de contas'])
+await montar('recorrentes', createElement(Recorrentes, CTX), ['Recorrentes'])
+await montar(
+  'configurações',
+  createElement(ConfigOrcamento, { ...CTX, aoMudar: nada, aoSair: nada }),
+  ['Configurações'],
+)
+await montar(
+  'seletor',
+  createElement(Seletor, {
+    orcamentos: [ORCAMENTO],
+    atualId: 'l1',
+    aoTrocar: nada,
+    aoEntrarEmNovo: nada,
+  }),
+  ['Nossa casa'],
+)
+await montar(
+  'perfil',
+  createElement(Perfil, {
+    usuario: { usuarioId: 'u1', email: 'joao@exemplo.dev', nome: null },
+    tema: 'claro',
+    aoMudarTema: nada,
+    aoAtualizar: nada,
+  }),
+  ['Perfil'],
 )
 
 console.log(

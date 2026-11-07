@@ -16,6 +16,9 @@ export type Linha = {
   occurred_on: string
   descricao: string | null
   paid_by: string | null
+  created_by: string
+  updated_by: string | null // autoria da última edição (F1)
+  recurring_id: string | null // gerado por recorrente (F7)
   pendente: boolean
 }
 
@@ -37,6 +40,9 @@ function daFila(l: LancamentoNovo): Linha {
     occurred_on: l.occurred_on,
     descricao: l.descricao,
     paid_by: l.paid_by,
+    created_by: l.created_by,
+    updated_by: null,
+    recurring_id: null, // a fila só tem o que a pessoa lançou à mão
     pendente: true,
   }
 }
@@ -81,11 +87,12 @@ export function useMes(ledgerId: string, mes: string, categorias: Categoria[]) {
     void recarregar()
   }, [recarregar])
 
-  // Tempo real: o outro lançou/apagou/mudou meta → relê. Membros não afeta o mês.
+  // Tempo real: só o que muda o mês. 'historico' chega junto de toda mudança
+  // e dispararia releitura em dobro (renomear categoria, entrar membro…).
   useEffect(() => {
     const releitura = comAtraso(() => void recarregar())
     const parar = ouvirOrcamento(ledgerId, (tipo) => {
-      if (tipo !== 'membros') releitura.chamar()
+      if (tipo === 'lancamentos' || tipo === 'metas') releitura.chamar()
     })
     return () => {
       parar()

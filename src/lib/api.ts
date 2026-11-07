@@ -7,7 +7,7 @@
 const env = (import.meta as { env?: Record<string, string | undefined> }).env ?? {}
 export const API_URL = (env.VITE_API_URL ?? 'https://orcamento.api.jaopd.dev').replace(/\/$/, '')
 
-export type Usuario = { usuarioId: string; email: string }
+export type Usuario = { usuarioId: string; email: string; nome: string | null }
 
 // --- sessão: quem quiser saber de login/logout escuta aqui ------------------
 

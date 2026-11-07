@@ -5,9 +5,12 @@ import { uuidv7 } from '@/lib/uuidv7'
 import { enfileirar } from '@/lib/fila'
 import { arquivarLancamento } from '@/features/lancamentos/lancamentos.queries'
 import { Icone } from '@/lib/icones'
+import { nomeDoMembro } from '@/lib/membros'
+import { EditarLancamento } from '@/features/lancamentos/EditarLancamento'
+import { SeloRecorrente } from '@/features/recorrentes/SeloRecorrente'
 import { useMes } from './useMes'
 import type { Linha } from './useMes'
-import type { Categoria, Especie, LancamentoNovo } from '@/lib/tipos'
+import type { Categoria, Especie, LancamentoNovo, Membro } from '@/lib/tipos'
 
 // A home, na cara do cashly: "Orçamento Mensal", navegador de mês, uma fileira de
 // cards de resumo e duas colunas (Receitas / Despesas) com "+ Adicionar" e estado
@@ -19,15 +22,24 @@ type Props = {
   categorias: Categoria[]
   usuarioId: string
   ocultar: boolean
+  /** user_id → membro; pra autoria nas linhas (F1 usa com nomeDoMembro) */
+  membros: Map<string, Membro>
 }
 
-export function Dashboard({ ledgerId, categorias, usuarioId, ocultar }: Props) {
+export function Dashboard({ ledgerId, categorias, usuarioId, ocultar, membros }: Props) {
   const [mes, setMes] = useState(mesDe())
   const { linhas, totais, porCategoria, metas, carregando, erro, recarregar } = useMes(
     ledgerId,
     mes,
     categorias,
   )
+
+  const [editando, setEditando] = useState<Linha | null>(null)
+  // filtro por kind dentro de useMemo: senão cada render recria e recompõe as colunas
+  const receitas = useMemo(() => linhas.filter((l) => l.kind === 'income'), [linhas])
+  const despesas = useMemo(() => linhas.filter((l) => l.kind === 'expense'), [linhas])
+  const catReceita = useMemo(() => categorias.filter((c) => c.kind === 'income'), [categorias])
+  const catDespesa = useMemo(() => categorias.filter((c) => c.kind === 'expense'), [categorias])
 
   const metaTotal = useMemo(() => metas.reduce((s, m) => s + m.limit_cents, 0), [metas])
   const porId = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias])
@@ -92,25 +104,29 @@ export function Dashboard({ ledgerId, categorias, usuarioId, ocultar }: Props) {
           especie="income"
           titulo="Receitas"
           cor="emerald"
-          linhas={linhas.filter((l) => l.kind === 'income')}
-          categorias={categorias.filter((c) => c.kind === 'income')}
+          linhas={receitas}
+          categorias={catReceita}
           porId={porId}
           ledgerId={ledgerId}
           usuarioId={usuarioId}
           ocultar={ocultar}
+          membros={membros}
           aoMudar={recarregar}
+          aoEditar={setEditando}
         />
         <Coluna
           especie="expense"
           titulo="Despesas"
           cor="red"
-          linhas={linhas.filter((l) => l.kind === 'expense')}
-          categorias={categorias.filter((c) => c.kind === 'expense')}
+          linhas={despesas}
+          categorias={catDespesa}
           porId={porId}
           ledgerId={ledgerId}
           usuarioId={usuarioId}
           ocultar={ocultar}
+          membros={membros}
           aoMudar={recarregar}
+          aoEditar={setEditando}
         />
       </div>
 
@@ -153,6 +169,20 @@ export function Dashboard({ ledgerId, categorias, usuarioId, ocultar }: Props) {
           </ul>
         )}
       </div>
+
+      {editando && (
+        <EditarLancamento
+          lancamento={editando}
+          categorias={categorias}
+          membros={membros}
+          usuarioId={usuarioId}
+          aoFechar={() => setEditando(null)}
+          aoSalvar={async () => {
+            setEditando(null)
+            await recarregar()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -208,7 +238,9 @@ function Coluna({
   ledgerId,
   usuarioId,
   ocultar,
+  membros,
   aoMudar,
+  aoEditar,
 }: {
   especie: Especie
   titulo: string
@@ -219,7 +251,9 @@ function Coluna({
   ledgerId: string
   usuarioId: string
   ocultar: boolean
+  membros: Map<string, Membro>
   aoMudar: () => Promise<void>
+  aoEditar: (l: Linha) => void
 }) {
   const [adicionando, setAdicionando] = useState(false)
   const c = CORES[cor]
@@ -277,6 +311,9 @@ function Coluna({
               categoria={l.category_id ? porId.get(l.category_id) : undefined}
               valorTexto={dinheiro(l.amount_cents)}
               corValor={c.valor}
+              membros={membros}
+              usuarioId={usuarioId}
+              aoEditar={() => aoEditar(l)}
               aoApagar={async () => {
                 await arquivarLancamento(l.id)
                 await aoMudar()
@@ -294,14 +331,30 @@ function ItemLinha({
   categoria,
   valorTexto,
   corValor,
+  membros,
+  usuarioId,
+  aoEditar,
   aoApagar,
 }: {
   linha: Linha
   categoria: Categoria | undefined
   valorTexto: string
   corValor: string
+  /** autoria: quem pagou (senão quem lançou), e quem editou se foi outra pessoa */
+  membros: Map<string, Membro>
+  usuarioId: string
+  aoEditar: () => void
   aoApagar: () => Promise<void>
 }) {
+  // "Gasto de um membro" é de quem pagou, senão de quem lançou: a linha mostra o mesmo dono.
+  const dono = nomeDoMembro(membros.get(linha.paid_by ?? linha.created_by))
+  const editor =
+    linha.updated_by && linha.updated_by !== linha.created_by
+      ? nomeDoMembro(membros.get(linha.updated_by), usuarioId)
+      : null
+  const subtitulo = [linha.descricao && categoria ? categoria.nome : null, dono, editor ? `editado por ${editor}` : null]
+    .filter(Boolean)
+    .join(' · ')
   const [confirmando, setConfirmando] = useState(false)
   return (
     <li className="group flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800">
@@ -309,17 +362,28 @@ function ItemLinha({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm text-gray-800 dark:text-gray-200">
           {linha.descricao || categoria?.nome || 'sem categoria'}
+          {linha.recurring_id && <SeloRecorrente className="ml-1" />}
         </p>
         <p className="text-[11px] text-gray-400 dark:text-gray-500">
-          {linha.descricao && categoria ? categoria.nome : ''}
+          {subtitulo}
           {linha.pendente && (
             <span className="text-amber-500 dark:text-amber-400">
-              {linha.descricao && categoria ? ' · ' : ''}aguardando rede
+              {subtitulo ? ' · ' : ''}aguardando rede
             </span>
           )}
         </p>
       </div>
       <span className={`text-sm font-medium tabular-nums ${corValor}`}>{valorTexto}</span>
+      {/* pendente ainda não existe no servidor, e editar é só online */}
+      {!linha.pendente && !confirmando && (
+        <button
+          onClick={aoEditar}
+          className="text-gray-300 transition-opacity hover:text-blue-500 sm:opacity-0 sm:group-hover:opacity-100 dark:text-gray-600"
+          aria-label="Editar"
+        >
+          <Icone n="pencil" className="h-4 w-4" />
+        </button>
+      )}
       {!linha.pendente &&
         (confirmando ? (
           <button

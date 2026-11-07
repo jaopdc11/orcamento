@@ -9,7 +9,17 @@
 
 import { API_URL } from './api'
 
-export type TipoEvento = 'lancamentos' | 'metas' | 'membros'
+// Espelho de orcamento-api/src/core/eventos.ts. 'historico' chega junto com
+// toda atividade, além do tipo específico.
+export type TipoEvento =
+  | 'lancamentos'
+  | 'metas'
+  | 'membros'
+  | 'historico'
+  | 'categorias'
+  | 'orcamento'
+  | 'economia'
+  | 'recorrentes'
 type Ouvinte = (tipo: TipoEvento) => void
 
 const canais = new Map<string, { fonte: EventSource; ouvintes: Set<Ouvinte> }>()
