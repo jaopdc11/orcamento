@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSessao } from '@/features/auth/useSessao'
 import { Login } from '@/features/auth/Login'
+import { useAtalhos } from '@/lib/atalhos'
+import { AjudaAtalhos } from '@/shell/AjudaAtalhos'
 import { Dashboard } from '@/features/mes/Dashboard'
 import { buscarCategorias } from '@/features/lancamentos/lancamentos.queries'
 import { Comecar } from '@/features/orcamentos/Comecar'
@@ -69,6 +71,7 @@ function Raiz() {
   const [vista, setVista] = useState<Vista>('inicio')
   const [seletorAberto, setSeletorAberto] = useState(false)
   const [lancando, setLancando] = useState(false)
+  const [ajudaAberta, setAjudaAberta] = useState(false)
   const [erroLista, setErroLista] = useState<string | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [tema, setTema] = useState<Tema>(temaAtual())
@@ -199,6 +202,27 @@ function Raiz() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
   }
 
+  // Atalhos globais (PC). Antes dos returns: hook não pode ser condicional.
+  useAtalhos(
+    {
+      n: () => setLancando(true),
+      '+': () => setLancando(true),
+      '1': () => irPara('inicio'),
+      '2': () => irPara('mes'),
+      '3': () => irPara('analises'),
+      '4': () => irPara('mais'),
+      '/': () => irPara('busca'),
+      o: () => setSeletorAberto(true),
+      v: trocarOcultar,
+      t: trocarTema,
+      '?': () => setAjudaAberta(true),
+      Escape: () => {
+        if (abaDe(vista) === 'mais' && vista !== 'mais') irPara('mais')
+      },
+    },
+    { ativo: !!sessao && !!orcamentos && orcamentos.length > 0, global: true },
+  )
+
   if (carregando) return <Tela />
   if (!sessao || !usuarioId) return <Login />
 
@@ -310,6 +334,8 @@ function Raiz() {
         aoTrocar={trocarOrcamento}
         aoEntrarEmNovo={entrouEm}
       />
+
+      <AjudaAtalhos aberto={ajudaAberta} aoFechar={() => setAjudaAberta(false)} />
 
       <Sheet aberto={lancando} aoFechar={() => setLancando(false)} selo={atual.nome} titulo="Novo lançamento" semPadding alto largura="sm">
         {categorias.length === 0 ? (

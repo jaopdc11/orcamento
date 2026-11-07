@@ -59,6 +59,10 @@ export function Sidebar(p: Props) {
         <Item icone={p.tema === 'escuro' ? 'sun' : 'moon'} rotulo={p.tema === 'escuro' ? 'Tema claro' : 'Tema escuro'} aoTocar={p.aoTrocarTema} />
         <Item icone="logOut" rotulo="Sair" aoTocar={p.aoSair} />
       </ul>
+      {/* sidebar só existe no desktop, onde tem teclado: é o lugar da dica */}
+      <p className="px-6 pb-4 text-xs text-tenue">
+        <kbd className="rounded border border-borda px-1.5 py-px font-mono text-[11px] text-suave">?</kbd> atalhos de teclado
+      </p>
     </aside>
   )
 }

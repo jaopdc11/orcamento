@@ -1,3 +1,4 @@
+import { useAtalhos } from '@/lib/atalhos'
 import { useMemo, useState } from 'react'
 import { deslocarMes, diaMes, hoje, mesDe, mesPorExtenso, paraDataLocal } from '@/lib/datas'
 import { arquivarLancamento } from '@/features/lancamentos/lancamentos.queries'
@@ -44,6 +45,15 @@ type Filtro = 'tudo' | 'expense' | 'income'
 
 export function Dashboard({ ledgerId, categorias, usuarioId, ocultar, membros }: Props) {
   const [mes, setMes] = useState(mesDe())
+  // ← → trocam de mês, H volta pro atual (PC). Globais: Sheet aberto tem prioridade.
+  useAtalhos(
+    {
+      ArrowLeft: () => setMes((m) => deslocarMes(m, -1)),
+      ArrowRight: () => setMes((m) => (m >= mesDe() ? m : deslocarMes(m, 1))),
+      h: () => setMes(mesDe()),
+    },
+    { global: true },
+  )
   const { linhas, totais, porCategoria, carregando, erro, recarregar } = useMes(ledgerId, mes, categorias)
   const [editando, setEditando] = useState<Linha | null>(null)
   const [filtro, setFiltro] = useState<Filtro>('tudo')

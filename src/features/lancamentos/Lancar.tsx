@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { formatarSeco, empurrarDigito, apagarDigito } from '@/lib/dinheiro'
 import { hoje, diaMes } from '@/lib/datas'
 import { uuidv7 } from '@/lib/uuidv7'
 import { enfileirar } from '@/lib/fila'
 import { Botao, Icone, IconeCategoria, Tabs, Vazio, cx, useToast, vibrar } from '@/design'
+import { useAtalhos } from '@/lib/atalhos'
 import type { Categoria, Especie, LancamentoNovo } from '@/lib/tipos'
 
 // A tela mais importante do app. Meta dura: 3 toques, menos de 4 segundos,
@@ -32,6 +33,8 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
   const [data, setData] = useState(hoje())
   const [descricao, setDescricao] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const refDescricao = useRef<HTMLInputElement>(null)
+  const refData = useRef<HTMLInputElement>(null)
 
   const visiveis = useMemo(() => categorias.filter((c) => c.kind === especie), [categorias, especie])
 
@@ -44,6 +47,39 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
     else if (t === '00') setCentavos((c) => empurrarDigito(empurrarDigito(c, '0'), '0'))
     else setCentavos((c) => empurrarDigito(c, t))
   }
+
+  function trocarEspecie(k: Especie) {
+    setEspecie(k)
+    setCategoriaId(null)
+  }
+
+  /** Setas andam na grade de 4 colunas; sem seleção, começa da primeira. */
+  function moverCategoria(passo: number) {
+    if (visiveis.length === 0) return
+    const atual = visiveis.findIndex((c) => c.id === categoriaId)
+    const i = atual < 0 ? 0 : Math.min(visiveis.length - 1, Math.max(0, atual + passo))
+    setCategoriaId(visiveis[i]!.id)
+  }
+
+  // Teclado físico (PC). Na descrição, só Enter (lançar) passa; o resto é texto.
+  const digitos = Object.fromEntries(
+    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => [d, () => tecla(d as (typeof TECLAS)[number])]),
+  )
+  useAtalhos(
+    {
+      ...digitos,
+      Backspace: () => tecla('⌫'),
+      Enter: () => void salvar(),
+      s: () => trocarEspecie('expense'),
+      e: () => trocarEspecie('income'),
+      ArrowRight: () => moverCategoria(1),
+      ArrowLeft: () => moverCategoria(-1),
+      ArrowDown: () => moverCategoria(4),
+      ArrowUp: () => moverCategoria(-4),
+      d: () => refDescricao.current?.focus(),
+    },
+    { mesmoDigitando: ['Enter'] },
+  )
 
   async function salvar() {
     if (!podeSalvar) return
@@ -144,15 +180,24 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
       <div className="shrink-0 border-t border-borda">
         <div className="flex items-center gap-2 px-4 py-2.5">
           <input
+            ref={refDescricao}
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
             placeholder="Descrição (opcional)"
             className="min-h-11 min-w-0 flex-1 rounded-card border border-borda bg-campo px-3 text-base text-texto outline-none placeholder:text-tenue focus:border-acento sm:text-sm"
           />
-          <label className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-card border border-borda bg-campo px-3 text-sm text-suave">
+          <label
+            // input date escondido não abre o calendário só com clique no label no PC
+            onClick={(e) => {
+              e.preventDefault()
+              refData.current?.showPicker?.()
+            }}
+            className="inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-card border border-borda bg-campo px-3 text-sm text-suave hover:border-borda-forte"
+          >
             <Icone n="calendar" className="h-4 w-4" />
             <span className="font-mono">{data === hoje() ? 'hoje' : diaMes(data)}</span>
             <input
+              ref={refData}
               type="date"
               value={data}
               max={hoje()}
