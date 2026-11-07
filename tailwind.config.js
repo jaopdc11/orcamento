@@ -56,6 +56,9 @@ export default {
         card: 'var(--sombra-card)',
         flutuante: 'var(--sombra-flutuante)',
       },
+      // Tailwind 3 só tem min-h-0/full/screen: sem isto, min-h-11 (alvo de toque
+      // de 44px) não gera CSS nenhum e todo botão vira uma fita achatada.
+      minHeight: ({ theme }) => theme('spacing'),
       spacing: {
         nav: '4.25rem', // altura da nav inferior (sem safe-area)
         topo: '3.5rem', // altura da top bar
