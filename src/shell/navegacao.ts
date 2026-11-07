@@ -8,7 +8,6 @@ export type Vista =
   | 'analises'
   | 'mais'
   | 'metas'
-  | 'acerto'
   | 'recorrentes'
   | 'historico'
   | 'busca'
@@ -26,7 +25,6 @@ export const ABAS: ItemVista[] = [
 
 export const ITENS_MAIS: ItemVista[] = [
   { id: 'metas', rotulo: 'Metas', icone: 'target', descricao: 'Teto por categoria e objetivos' },
-  { id: 'acerto', rotulo: 'Acerto de contas', icone: 'scale', descricao: 'Quem deve quanto pra quem' },
   { id: 'recorrentes', rotulo: 'Recorrentes', icone: 'repeat', descricao: 'Contas que se repetem todo mês' },
   { id: 'historico', rotulo: 'Histórico', icone: 'history', descricao: 'O que mudou e quem mudou' },
   { id: 'busca', rotulo: 'Busca', icone: 'search', descricao: 'Achar qualquer lançamento' },

@@ -12,7 +12,6 @@ import { Historico } from '@/features/historico/Historico'
 import { Metas } from '@/features/metas/Metas'
 import { Analises } from '@/features/analises/Analises'
 import { Perfil } from '@/features/perfil/Perfil'
-import { Acerto } from '@/features/acerto/Acerto'
 import { Recorrentes } from '@/features/recorrentes/Recorrentes'
 import { Busca } from '@/features/busca/Busca'
 import { aoMudarFila, ligarDrenagemAutomatica } from '@/lib/fila'
@@ -264,8 +263,6 @@ function Raiz() {
         return <Metas {...ctx} />
       case 'analises':
         return <Analises {...ctx} />
-      case 'acerto':
-        return <Acerto {...ctx} aoMudar={recarregarOrcamentoAtual} />
       case 'recorrentes':
         return <Recorrentes {...ctx} />
       case 'config':

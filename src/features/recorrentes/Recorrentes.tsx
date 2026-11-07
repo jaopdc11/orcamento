@@ -241,6 +241,7 @@ function SheetRecorrente({
   const [categoria, setCategoria] = useState('')
   const [pagador, setPagador] = useState('')
   const [dia, setDia] = useState(5)
+  const [diaTexto, setDiaTexto] = useState('5')
   const [salvando, setSalvando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -254,6 +255,7 @@ function SheetRecorrente({
     setCategoria(atual?.category_id ?? '')
     setPagador(atual?.paid_by ?? '')
     setDia(atual?.dia_do_mes ?? 5)
+    setDiaTexto(String(atual?.dia_do_mes ?? 5))
     setSalvando(false)
     setConfirmando(false)
     setErro(null)
@@ -346,13 +348,26 @@ function SheetRecorrente({
           <TecladoValor centavos={centavos} aoMudar={setCentavos} tom={kind === 'expense' ? 'saida' : 'entrada'} rotulo="Valor todo mês" />
 
           <div className="grid grid-cols-2 gap-3">
-            <Select rotulo="Todo dia" value={dia} onChange={(e) => setDia(Number(e.target.value))} className="font-mono">
-              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </Select>
+            {/* texto que só aceita dígito: digitar "15" é mais rápido que achar 15 numa lista,
+                e o <select> nativo dentro do sheet pedia clicar e segurar no PC */}
+            <Campo
+              rotulo="Todo dia"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={2}
+              value={diaTexto}
+              onChange={(e) => {
+                const so = e.target.value.replace(/\D/g, '').slice(0, 2)
+                setDiaTexto(so)
+                const n = Number(so)
+                if (n >= 1 && n <= 28) setDia(n)
+              }}
+              // fora de 1–28 (ou vazio) volta pro último dia válido ao sair do campo
+              onBlur={() => setDiaTexto(String(dia))}
+              ajuda="de 1 a 28"
+              erro={diaTexto !== '' && (Number(diaTexto) < 1 || Number(diaTexto) > 28) ? 'de 1 a 28' : undefined}
+              className="font-mono"
+            />
             <Select rotulo="Quem paga" value={pagador} onChange={(e) => setPagador(e.target.value)}>
               <option value="">o pote</option>
               {membros.map((m) => (

@@ -67,7 +67,6 @@ const { SeletorSheet } = await import('../shell/SeletorSheet')
 const { Metas } = await import('../features/metas/Metas')
 const { Analises } = await import('../features/analises/Analises')
 const { Perfil } = await import('../features/perfil/Perfil')
-const { Acerto } = await import('../features/acerto/Acerto')
 const { Recorrentes } = await import('../features/recorrentes/Recorrentes')
 const { Busca } = await import('../features/busca/Busca')
 const { Inicio } = await import('../features/inicio/Inicio')
@@ -184,7 +183,7 @@ await montar('início vazio não quebra', createElement(Inicio, CTX), ['Início'
 await montar(
   'mais lista as telas',
   createElement(Mais, { aoIr: nada, tema: 'escuro', aoTrocarTema: nada, aoSair: nada }),
-  ['Metas', 'Acerto de contas', 'Recorrentes', 'Histórico', 'Busca', 'Configurações', 'Perfil'],
+  ['Metas', 'Recorrentes', 'Histórico', 'Busca', 'Configurações', 'Perfil'],
 )
 await montar(
   'nav inferior',
@@ -205,7 +204,6 @@ await montar('histórico', createElement(Historico, CTX), ['Histórico'])
 await montar('busca', createElement(Busca, CTX), ['Busca'])
 await montar('metas', createElement(Metas, CTX), ['Metas'])
 await montar('análises', createElement(Analises, CTX), ['Análises'])
-await montar('acerto', createElement(Acerto, { ...CTX, aoMudar: nada }), ['Acerto de contas'])
 await montar('recorrentes', createElement(Recorrentes, CTX), ['Recorrentes'])
 await montar(
   'configurações',
