@@ -1,0 +1,6 @@
+# A pnpm 12 bloqueia postinstall por padrão. Estes dois precisam do seu,
+# senão não baixam os binários nativos e o build não roda.
+# (mesmo formato do web/fisica/simulador-web)
+allowBuilds:
+  '@swc/core': true
+  esbuild: true

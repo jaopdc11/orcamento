@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Paleta do fin-calc: azul primário, verde na entrada, vermelho na saída e uma
+     escala de cinzas neutra (mesmos hex do app Android, ui/theme/Theme.kt). Agora
+     com modo claro E escuro — o sistema decide via prefers-color-scheme.
+     Valores em canais RGB "r g b" pra casar com o rgb(var(...) / alpha) do Tailwind. */
+  :root {
+    color-scheme: light;
+    --fundo: 255 255 255; /* branco       — background */
+    --painel: 249 250 251; /* gray50       — surfaceVariant (cards) */
+    --painel-forte: 243 244 246; /* gray100      — estados pressionados */
+    --borda: 229 231 235; /* gray200      — outline */
+    --texto: 17 24 39; /* gray900      — onSurface */
+    --apagado: 107 114 128; /* gray500      — texto secundário */
+    --primaria: 37 99 235; /* blue600      — ação primária */
+    --saida: 239 68 68; /* red500       — despesa */
+    --entrada: 5 150 105; /* emerald600   — receita */
+    --atencao: 245 158 11; /* amber500     — aviso (ex: aguardando rede) */
+  }
+
+  /* Dark por CLASSE (.dark no <html>), pra o toggle mandar. Os mesmos tokens das
+     telas antigas seguem a classe; as telas novas usam gray/emerald/red direto. */
+  .dark {
+    color-scheme: dark;
+    --fundo: 3 7 18; /* gray950 */
+    --painel: 17 24 39; /* gray900 */
+    --painel-forte: 31 41 55; /* gray800 */
+    --borda: 31 41 55; /* gray800 */
+    --texto: 243 244 246; /* gray100 */
+    --apagado: 156 163 175; /* gray400 */
+    /* primária fica no blue600 nos dois modos: é sempre fundo de botão com texto
+       branco, e branco sobre blue600 passa AA nas duas cores de fundo. */
+    --saida: 248 113 113; /* red400 */
+    --entrada: 52 211 153; /* emerald400 */
+  }
+
+  html,
+  body,
+  #root {
+    @apply bg-fundo text-texto;
+    min-height: 100dvh;
+  }
+
+  body {
+    margin: 0;
+    /* Inter, igual o cashly — é boa parte do "cara" do design. */
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* teclado numérico colado na borda inferior do iPhone */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-top: env(safe-area-inset-top, 0px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* o app é uma tela só, sem scroll de página: quem rola é a grade de categorias */
+  body {
+    overscroll-behavior: none;
+  }
+}
