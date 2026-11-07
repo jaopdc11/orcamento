@@ -3,6 +3,7 @@ import { buscarLancamentosDoMes } from '@/features/lancamentos/lancamentos.queri
 import { buscarMetas } from './mes.queries'
 import { intervaloDoMes } from '@/lib/datas'
 import { aoMudarFila } from '@/lib/fila'
+import { comAtraso, ouvirOrcamento } from '@/lib/eventos'
 import type { Categoria, Lancamento, LancamentoNovo, Meta } from '@/lib/tipos'
 
 /** Uma linha da lista: do servidor, ou ainda na fila esperando rede. */
@@ -79,6 +80,18 @@ export function useMes(ledgerId: string, mes: string, categorias: Categoria[]) {
     setCarregando(true)
     void recarregar()
   }, [recarregar])
+
+  // Tempo real: o outro lançou/apagou/mudou meta → relê. Membros não afeta o mês.
+  useEffect(() => {
+    const releitura = comAtraso(() => void recarregar())
+    const parar = ouvirOrcamento(ledgerId, (tipo) => {
+      if (tipo !== 'membros') releitura.chamar()
+    })
+    return () => {
+      parar()
+      releitura.cancelar()
+    }
+  }, [ledgerId, recarregar])
 
   useEffect(() => {
     const aoFocar = () => {

@@ -6,6 +6,7 @@ import {
   cancelarConvite,
   formatarCodigo,
 } from './orcamentos.queries'
+import { ouvirOrcamento } from '@/lib/eventos'
 import type { Convite, Membro, Orcamento } from '@/lib/tipos'
 
 type Props = {
@@ -37,6 +38,15 @@ export function Membros({ orcamento, usuarioId, aoFechar }: Props) {
   useEffect(() => {
     void recarregar()
   }, [recarregar])
+
+  // Tempo real: a Gabi aceitou o convite → aparece aqui sem F5.
+  useEffect(
+    () =>
+      ouvirOrcamento(orcamento.id, (tipo) => {
+        if (tipo === 'membros') void recarregar()
+      }),
+    [orcamento.id, recarregar],
+  )
 
   async function gerar() {
     setGerando(true)
