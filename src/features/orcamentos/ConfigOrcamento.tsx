@@ -1,8 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CabecalhoTela } from '@/lib/ui'
 import { ouvirOrcamento } from '@/lib/eventos'
 import { nomeDoMembro } from '@/lib/membros'
-import type { Categoria, ContextoOrcamento, Convite, Especie } from '@/lib/tipos'
+import type { Categoria, ContextoOrcamento, Convite, Especie, Membro } from '@/lib/tipos'
+import {
+  Aviso,
+  Badge,
+  Botao,
+  BotaoIcone,
+  CabecalhoTela,
+  Campo,
+  Cartao,
+  EsqueletoLista,
+  Icone,
+  IconeCategoria,
+  LinhaLista,
+  Lista,
+  Sheet,
+  Tabs,
+  TituloSecao,
+  Vazio,
+  useToast,
+  vibrar, Avatar,
+} from '@/design'
+import { CartaoConvite } from './CartaoConvite'
 import {
   arquivarCategoria,
   cancelarConvite,
@@ -10,7 +30,6 @@ import {
   criarCategoria,
   criarConvite,
   editarCategoria,
-  formatarCodigo,
   mudarMeuApelido,
   removerMembro,
   renomearOrcamento,
@@ -24,13 +43,6 @@ export type Props = ContextoOrcamento & {
   /** você saiu (ou foi removido) deste orçamento: o App troca pra outro */
   aoSair: () => void
 }
-
-const campo =
-  'w-full min-w-0 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-primaria dark:border-gray-800 dark:bg-gray-900 dark:text-white'
-const botao = 'rounded-lg bg-primaria px-3 py-2 text-sm font-semibold text-white disabled:opacity-50'
-const secao = 'mb-8'
-const tituloSecao = 'mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500'
-const cartao = 'rounded-lg border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900'
 
 function msg(e: unknown, padrao: string) {
   return e instanceof Error ? e.message : padrao
@@ -48,21 +60,24 @@ export function ConfigOrcamento({ orcamento, usuarioId, membros, aoMudar, aoSair
       return true
     } catch (e) {
       setErro(msg(e, padrao))
+      vibrar('erro')
       return false
     }
   }, [])
 
   return (
     <div className="mx-auto max-w-xl">
-      <CabecalhoTela titulo="Configurações" subtitulo={orcamento.nome} />
+      <CabecalhoTela selo={orcamento.nome} titulo="Configurações" descricao="Nome, quem participa e as categorias deste orçamento." />
       {erro && (
-        <p role="alert" className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-saida dark:bg-red-950/40">
+        <Aviso className="mb-4 animate-fade" aoTentarDeNovo={() => setErro(null)}>
           {erro}
-        </p>
+        </Aviso>
       )}
-      <SecaoNome key={orcamento.id + orcamento.nome} {...{ orcamento, usuarioId, membros, agir, aoMudar }} />
-      <SecaoMembros {...{ orcamento, usuarioId, membros, agir, aoMudar, aoSair }} />
-      <SecaoCategorias ledgerId={orcamento.id} agir={agir} aoMudar={aoMudar} />
+      <div className="cascata space-y-8">
+        <SecaoNome key={orcamento.id + orcamento.nome} {...{ orcamento, usuarioId, membros, agir, aoMudar }} />
+        <SecaoMembros {...{ orcamento, usuarioId, membros, agir, aoMudar, aoSair }} />
+        <SecaoCategorias ledgerId={orcamento.id} agir={agir} aoMudar={aoMudar} />
+      </div>
     </div>
   )
 }
@@ -78,6 +93,7 @@ function SecaoNome({
   agir,
   aoMudar,
 }: Pick<Props, 'orcamento' | 'usuarioId' | 'membros' | 'aoMudar'> & { agir: Agir }) {
+  const toast = useToast()
   const eu = membros.find((m) => m.user_id === usuarioId)
   const [nome, setNome] = useState(orcamento.nome)
   const [apelido, setApelido] = useState(eu?.apelido ?? '')
@@ -96,32 +112,34 @@ function SecaoNome({
       if ((apelido.trim() || null) !== (eu?.apelido ?? null)) await mudarMeuApelido(orcamento.id, apelido.trim() || null)
     })
     setSalvando(false)
-    if (ok) aoMudar()
+    if (ok) {
+      vibrar('sucesso')
+      toast.mostrar('Salvo', { tom: 'sucesso' })
+      aoMudar()
+    }
   }
 
   return (
-    <form onSubmit={salvar} className={secao}>
-      <h3 className={tituloSecao}>Orçamento</h3>
-      <div className={`${cartao} flex flex-col gap-3 p-3`}>
-        <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
-          Nome
-          <input required maxLength={80} value={nome} onChange={(e) => setNome(e.target.value)} className={campo} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
-          Como você aparece aqui (apelido)
-          <input
+    <section>
+      <TituloSecao selo="Orçamento" titulo="Nome e apelido" />
+      <Cartao>
+        <form onSubmit={salvar} className="space-y-4">
+          <Campo rotulo="Nome" required maxLength={80} value={nome} onChange={(e) => setNome(e.target.value)} />
+          <Campo
+            rotulo="Como você aparece aqui (apelido)"
             maxLength={40}
             value={apelido}
             onChange={(e) => setApelido(e.target.value)}
             placeholder={eu?.nome || eu?.email.split('@')[0] || ''}
-            className={campo}
           />
-        </label>
-        <button type="submit" disabled={!mudou || salvando || !nome.trim()} className={`${botao} self-end`}>
-          {salvando ? 'Salvando…' : 'Salvar'}
-        </button>
-      </div>
-    </form>
+          <div className="flex justify-end">
+            <Botao type="submit" carregando={salvando} disabled={!mudou || !nome.trim()}>
+              {salvando ? 'Salvando…' : 'Salvar'}
+            </Botao>
+          </div>
+        </form>
+      </Cartao>
+    </section>
   )
 }
 
@@ -135,10 +153,11 @@ function SecaoMembros({
   aoMudar,
   aoSair,
 }: Pick<Props, 'orcamento' | 'usuarioId' | 'membros' | 'aoMudar' | 'aoSair'> & { agir: Agir }) {
+  const toast = useToast()
   const [convites, setConvites] = useState<Convite[]>([])
-  const [confirmando, setConfirmando] = useState<string | null>(null)
+  const [confirmando, setConfirmando] = useState<Membro | null>(null)
+  const [removendo, setRemovendo] = useState(false)
   const [gerando, setGerando] = useState(false)
-  const [copiado, setCopiado] = useState<string | null>(null)
 
   const recarregar = useCallback(async () => {
     try {
@@ -162,99 +181,112 @@ function SecaoMembros({
   )
 
   async function remover(userId: string) {
-    setConfirmando(null)
+    setRemovendo(true)
     const ok = await agir(() => removerMembro(orcamento.id, userId), 'Não consegui remover.')
+    setRemovendo(false)
+    setConfirmando(null)
     if (!ok) return
+    vibrar('aviso')
     if (userId === usuarioId) aoSair()
-    else aoMudar()
+    else {
+      toast.mostrar('Membro removido', { tom: 'info' })
+      aoMudar()
+    }
   }
 
   async function gerar() {
     setGerando(true)
-    await agir(async () => {
+    const ok = await agir(async () => {
       await criarConvite(orcamento.id)
       await recarregar()
     }, 'Não consegui gerar o código.')
     setGerando(false)
-  }
-
-  async function copiar(code: string) {
-    try {
-      await navigator.clipboard.writeText(formatarCodigo(code))
-      setCopiado(code)
-      setTimeout(() => setCopiado(null), 2000)
-    } catch {
-      // clipboard bloqueada: o código está na tela, dá pra ler.
+    if (ok) {
+      vibrar('sucesso')
+      toast.mostrar('Convite criado. Toque no código pra copiar.', { tom: 'sucesso' })
     }
   }
 
+  const souEuConfirmando = confirmando?.user_id === usuarioId
+
   return (
-    <section className={secao}>
-      <h3 className={tituloSecao}>Membros</h3>
-      <ul className={`${cartao} mb-3 divide-y divide-gray-100 dark:divide-gray-800`}>
+    <section>
+      <TituloSecao selo="Membros" titulo="Quem participa" acao={<Badge mono>{membros.length}</Badge>} />
+      <Lista cascata className="mb-3">
         {membros.map((m) => {
           const souEu = m.user_id === usuarioId
           return (
-            <li key={m.user_id} className="flex items-center gap-3 px-3 py-2">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm text-gray-900 dark:text-white">{nomeDoMembro(m, usuarioId)}</p>
-                <p className="truncate text-xs text-gray-400 dark:text-gray-500">{m.email}</p>
-              </div>
-              {confirmando === m.user_id ? (
-                <span className="flex shrink-0 gap-2 text-xs">
-                  <button onClick={() => void remover(m.user_id)} className="font-semibold text-saida">
-                    {souEu ? 'sair mesmo' : 'remover'}
-                  </button>
-                  <button onClick={() => setConfirmando(null)} className="text-gray-400">
-                    cancelar
-                  </button>
-                </span>
-              ) : (
-                <button onClick={() => setConfirmando(m.user_id)} className="shrink-0 text-xs text-gray-400 hover:text-saida">
-                  {souEu ? 'sair' : 'remover'}
-                </button>
-              )}
-            </li>
+            <LinhaLista
+              key={m.user_id}
+              inicio={<Avatar nome={nomeDoMembro(m)} destaque={souEu} />}
+              titulo={nomeDoMembro(m, usuarioId)}
+              subtitulo={m.email}
+              acoes={
+                souEu ? (
+                  <Botao variante="fantasma" tamanho="sm" onClick={() => setConfirmando(m)}>
+                    Sair
+                  </Botao>
+                ) : (
+                  <BotaoIcone rotulo={`Remover ${nomeDoMembro(m)}`} onClick={() => setConfirmando(m)}>
+                    <Icone n="trash" />
+                  </BotaoIcone>
+                )
+              }
+            />
           )
         })}
-      </ul>
+      </Lista>
 
-      {convites.length > 0 && (
-        <ul className="mb-3 flex flex-col gap-2">
-          {convites.map((c) => (
-            <li key={c.code} className={`${cartao} p-3`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <code className="text-lg tracking-[0.2em] text-gray-900 dark:text-white">{formatarCodigo(c.code)}</code>
-                <div className="flex gap-3 text-xs">
-                  <button onClick={() => void copiar(c.code)} className="text-gray-500 underline">
-                    {copiado === c.code ? 'copiado' : 'copiar'}
-                  </button>
-                  <button
-                    onClick={() =>
-                      void agir(async () => {
-                        await cancelarConvite(c.code)
-                        await recarregar()
-                      })
-                    }
-                    className="text-saida underline"
-                  >
-                    cancelar
-                  </button>
-                </div>
-              </div>
-              <p className="mt-1 text-xs text-gray-400">
-                vence em {new Date(c.expires_at).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button onClick={() => void gerar()} disabled={gerando} className={`${botao} w-full`}>
-        {gerando ? 'Gerando…' : 'Convidar alguém'}
-      </button>
-      <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-        A pessoa entra no app, escolhe “Tenho um código” e cola. Vale 7 dias e serve uma vez só.
-      </p>
+      <div className="space-y-3">
+        {convites.map((c) => (
+          <CartaoConvite
+            key={c.code}
+            convite={c}
+            aoCancelar={() =>
+              agir(async () => {
+                await cancelarConvite(c.code)
+                await recarregar()
+                toast.mostrar('Convite cancelado', { tom: 'info' })
+              })
+            }
+          />
+        ))}
+        <Botao cheio variante="secundario" carregando={gerando} icone={<Icone n="plus" />} onClick={() => void gerar()}>
+          {gerando ? 'Gerando…' : 'Convidar alguém'}
+        </Botao>
+        <p className="text-xs text-tenue">
+          A pessoa entra no app, escolhe “Tenho um código” e cola. Vale 7 dias e serve uma vez só.
+        </p>
+      </div>
+
+      <Sheet
+        aberto={!!confirmando}
+        aoFechar={() => setConfirmando(null)}
+        selo="Membros"
+        titulo={souEuConfirmando ? 'Sair deste orçamento?' : `Remover ${confirmando ? nomeDoMembro(confirmando) : ''}?`}
+        largura="sm"
+        rodape={
+          <>
+            <Botao variante="fantasma" className="flex-1" onClick={() => setConfirmando(null)}>
+              Cancelar
+            </Botao>
+            <Botao
+              variante="perigo"
+              className="flex-1"
+              carregando={removendo}
+              onClick={() => confirmando && void remover(confirmando.user_id)}
+            >
+              {souEuConfirmando ? 'Sair mesmo' : 'Remover'}
+            </Botao>
+          </>
+        }
+      >
+        <p className="text-sm text-suave">
+          {souEuConfirmando
+            ? 'Você deixa de ver os lançamentos daqui. Pra voltar, alguém precisa te mandar um código novo.'
+            : 'A pessoa deixa de ver este orçamento. Os lançamentos que ela fez continuam.'}
+        </p>
+      </Sheet>
     </section>
   )
 }
@@ -262,9 +294,10 @@ function SecaoMembros({
 // --- categorias ----------------------------------------------------------------
 
 function SecaoCategorias({ ledgerId, agir, aoMudar }: { ledgerId: string; agir: Agir; aoMudar: () => void }) {
+  const toast = useToast()
   const [lista, setLista] = useState<Categoria[] | null>(null)
   const [kind, setKind] = useState<Especie>('expense')
-  const [editando, setEditando] = useState<string | 'nova' | null>(null)
+  const [editando, setEditando] = useState<Categoria | 'nova' | null>(null)
   const [verArquivadas, setVerArquivadas] = useState(false)
 
   const recarregar = useCallback(async () => {
@@ -307,133 +340,168 @@ function SecaoCategorias({ ledgerId, agir, aoMudar }: { ledgerId: string; agir: 
     const j = i + delta
     if (j < 0 || j >= ids.length) return
     ;[ids[i], ids[j]] = [ids[j]!, ids[i]!]
+    vibrar('leve')
     // Otimista: a seta responde na hora; o servidor confirma em seguida.
     setLista((l) => l && l.map((c) => (ids.includes(c.id) ? { ...c, ordem: (ids.indexOf(c.id) + 1) * 10 } : c)))
     void depois(() => reordenarCategorias(ledgerId, ids))
   }
 
+  async function arquivar(c: Categoria, sim: boolean) {
+    const ok = await depois(() => arquivarCategoria(ledgerId, c.id, sim))
+    if (!ok) return
+    if (sim) {
+      vibrar('aviso')
+      toast.mostrar(`${c.nome} arquivada`, {
+        tom: 'info',
+        acao: { rotulo: 'Desfazer', aoTocar: () => void depois(() => arquivarCategoria(ledgerId, c.id, false)) },
+      })
+    } else toast.mostrar(`${c.nome} de volta`, { tom: 'sucesso' })
+  }
+
+  const rotuloTipo = kind === 'expense' ? 'saída' : 'entrada'
+
   return (
-    <section className={secao}>
-      <h3 className={tituloSecao}>Categorias</h3>
-      <div className="mb-3 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-800 dark:bg-gray-900">
-        {(['expense', 'income'] as const).map((k) => (
-          <button
-            key={k}
-            onClick={() => {
-              setKind(k)
-              setEditando(null)
-            }}
-            className={`flex-1 rounded-md py-1.5 text-sm font-semibold ${
-              kind === k ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white' : 'text-gray-400'
-            }`}
-          >
-            {k === 'expense' ? 'Saídas' : 'Entradas'}
-          </button>
-        ))}
-      </div>
+    <section>
+      <TituloSecao selo="Categorias" titulo="Onde o dinheiro vai e de onde vem" />
+      <Tabs
+        cheio
+        className="mb-3"
+        tom={kind === 'expense' ? 'saida' : 'entrada'}
+        abas={[
+          { id: 'expense', rotulo: 'Saídas' },
+          { id: 'income', rotulo: 'Entradas' },
+        ]}
+        ativa={kind}
+        aoTrocar={(k) => {
+          setKind(k)
+          setEditando(null)
+        }}
+      />
 
       {lista === null ? (
-        <p className="py-6 text-center text-sm text-gray-400">carregando…</p>
+        <EsqueletoLista />
+      ) : ativas.length === 0 ? (
+        <Cartao>
+          <Vazio
+            compacto
+            icone="list"
+            titulo={`Nenhuma categoria de ${rotuloTipo}. Crie a primeira e o teclado de lançar já mostra.`}
+          />
+        </Cartao>
       ) : (
-        <ul className={`${cartao} mb-3 divide-y divide-gray-100 dark:divide-gray-800`}>
-          {ativas.map((c, i) =>
-            editando === c.id ? (
-              <li key={c.id} className="p-3">
-                <FormCategoria
-                  inicial={c}
-                  aoCancelar={() => setEditando(null)}
-                  aoSalvar={async (d) => {
-                    if (await depois(() => editarCategoria(ledgerId, c.id, d))) setEditando(null)
-                  }}
-                />
-              </li>
-            ) : (
-              <li key={c.id} className="flex items-center gap-2 px-3 py-2">
-                <Bolinha c={c} />
-                <span className="min-w-0 flex-1 truncate text-sm text-gray-900 dark:text-white">{c.nome}</span>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-gray-400">
-                  <button aria-label={`subir ${c.nome}`} disabled={i === 0} onClick={() => mover(i, -1)} className="px-1.5 py-1 disabled:opacity-30">
-                    ↑
-                  </button>
-                  <button
-                    aria-label={`descer ${c.nome}`}
+        // key por tipo: trocar a aba remonta e a cascata toca de novo
+        <Lista cascata key={kind}>
+          {ativas.map((c, i) => (
+            <LinhaLista
+              key={c.id}
+              inicio={<IconeCategoria categoria={c} />}
+              titulo={c.nome}
+              aoTocar={() => setEditando(c)}
+              acoes={
+                <>
+                  <BotaoIcone rotulo={`subir ${c.nome}`} disabled={i === 0} onClick={() => mover(i, -1)} className="disabled:opacity-30">
+                    <span className="font-mono text-base">↑</span>
+                  </BotaoIcone>
+                  <BotaoIcone
+                    rotulo={`descer ${c.nome}`}
                     disabled={i === ativas.length - 1}
                     onClick={() => mover(i, 1)}
-                    className="px-1.5 py-1 disabled:opacity-30"
+                    className="disabled:opacity-30"
                   >
-                    ↓
-                  </button>
-                  <button onClick={() => setEditando(c.id)} className="px-1.5 py-1 hover:text-gray-700 dark:hover:text-gray-200">
-                    editar
-                  </button>
-                  <button
-                    onClick={() => void depois(() => arquivarCategoria(ledgerId, c.id, true))}
-                    className="px-1.5 py-1 hover:text-saida"
-                  >
-                    arquivar
-                  </button>
-                </span>
-              </li>
-            ),
-          )}
-          {ativas.length === 0 && <li className="px-3 py-4 text-center text-sm text-gray-400">nenhuma categoria ativa</li>}
-        </ul>
+                    <span className="font-mono text-base">↓</span>
+                  </BotaoIcone>
+                  <BotaoIcone rotulo={`arquivar ${c.nome}`} onClick={() => void arquivar(c, true)}>
+                    <Icone n="inbox" />
+                  </BotaoIcone>
+                </>
+              }
+            />
+          ))}
+        </Lista>
       )}
 
-      {editando === 'nova' ? (
-        <div className={`${cartao} mb-3 p-3`}>
-          <FormCategoria
-            aoCancelar={() => setEditando(null)}
-            aoSalvar={async (d) => {
-              if (await depois(() => criarCategoria(ledgerId, { ...d, kind }))) setEditando(null)
-            }}
-          />
-        </div>
-      ) : (
-        <button onClick={() => setEditando('nova')} className={`${botao} mb-3 w-full`}>
-          Nova categoria de {kind === 'expense' ? 'saída' : 'entrada'}
-        </button>
-      )}
+      <Botao cheio variante="secundario" className="mt-3" icone={<Icone n="plus" />} onClick={() => setEditando('nova')}>
+        Nova categoria de {rotuloTipo}
+      </Botao>
 
       {arquivadas.length > 0 && (
-        <div>
-          <button onClick={() => setVerArquivadas((v) => !v)} className="text-xs text-gray-400 underline">
-            {verArquivadas ? 'esconder' : 'ver'} arquivadas ({arquivadas.length})
-          </button>
+        <div className="mt-4">
+          <Botao variante="fantasma" tamanho="sm" onClick={() => setVerArquivadas((v) => !v)}>
+            {verArquivadas ? 'Esconder' : 'Ver'} arquivadas <span className="font-mono">({arquivadas.length})</span>
+          </Botao>
           {verArquivadas && (
-            <ul className={`${cartao} mt-2 divide-y divide-gray-100 dark:divide-gray-800`}>
+            <Lista className="mt-2 animate-fade">
               {arquivadas.map((c) => (
-                <li key={c.id} className="flex items-center gap-2 px-3 py-2 opacity-70">
-                  <Bolinha c={c} />
-                  <span className="min-w-0 flex-1 truncate text-sm text-gray-500">{c.nome}</span>
-                  <button
-                    onClick={() => void depois(() => arquivarCategoria(ledgerId, c.id, false))}
-                    className="shrink-0 text-xs text-primaria"
-                  >
-                    desarquivar
-                  </button>
-                </li>
+                <LinhaLista
+                  key={c.id}
+                  apagada
+                  inicio={<IconeCategoria categoria={c} />}
+                  titulo={c.nome}
+                  acoes={
+                    <Botao variante="fantasma" tamanho="sm" onClick={() => void arquivar(c, false)}>
+                      Desarquivar
+                    </Botao>
+                  }
+                />
               ))}
-            </ul>
+            </Lista>
           )}
         </div>
       )}
+
+      <SheetCategoria
+        aberto={editando !== null}
+        inicial={editando === 'nova' ? undefined : editando ?? undefined}
+        rotuloTipo={rotuloTipo}
+        aoFechar={() => setEditando(null)}
+        aoSalvar={async (d) => {
+          const alvo = editando
+          const ok =
+            alvo === 'nova'
+              ? await depois(() => criarCategoria(ledgerId, { ...d, kind }))
+              : alvo
+                ? await depois(() => editarCategoria(ledgerId, alvo.id, d))
+                : false
+          if (ok) {
+            vibrar('sucesso')
+            toast.mostrar(alvo === 'nova' ? 'Categoria criada' : 'Categoria salva', { tom: 'sucesso' })
+            setEditando(null)
+          }
+        }}
+      />
     </section>
   )
 }
 
-function Bolinha({ c }: { c: Pick<Categoria, 'emoji' | 'cor'> }) {
+type Dados = { nome: string; emoji: string | null; cor: string | null }
+
+// Formulário de categoria num Sheet. Remonta por key a cada abertura pra o
+// estado do formulário partir sempre da categoria certa.
+function SheetCategoria({
+  aberto,
+  inicial,
+  rotuloTipo,
+  aoSalvar,
+  aoFechar,
+}: {
+  aberto: boolean
+  inicial?: Categoria
+  rotuloTipo: string
+  aoSalvar: (d: Dados) => Promise<void>
+  aoFechar: () => void
+}) {
   return (
-    <span
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-100 text-sm dark:bg-gray-800"
-      style={c.cor ? { backgroundColor: c.cor + '33', boxShadow: `inset 0 0 0 1.5px ${c.cor}` } : undefined}
+    <Sheet
+      aberto={aberto}
+      aoFechar={aoFechar}
+      selo="Categorias"
+      titulo={inicial ? 'Editar categoria' : `Nova categoria de ${rotuloTipo}`}
+      largura="sm"
     >
-      {c.emoji || '•'}
-    </span>
+      {aberto && <FormCategoria key={inicial?.id ?? 'nova'} inicial={inicial} aoSalvar={aoSalvar} aoCancelar={aoFechar} />}
+    </Sheet>
   )
 }
-
-type Dados = { nome: string; emoji: string | null; cor: string | null }
 
 function FormCategoria({
   inicial,
@@ -456,50 +524,58 @@ function FormCategoria({
     setOcupado(false)
   }
 
+  // prévia ao vivo: o mesmo IconeCategoria que aparece na lista e no teclado
+  const previa = { id: inicial?.id, nome: nome || 'categoria', emoji: emoji.trim() || null, cor: cor || null }
+
   return (
-    <form onSubmit={enviar} className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <input
+    <form onSubmit={enviar} className="space-y-4">
+      <div className="flex items-end gap-3">
+        <IconeCategoria categoria={previa} tamanho="lg" />
+        <Campo
+          rotulo="Emoji"
           value={emoji}
           onChange={(e) => setEmoji(e.target.value)}
           maxLength={8}
           placeholder="🙂"
-          aria-label="Emoji"
-          className={`${campo} w-14 flex-none text-center`}
+          classeCaixa="w-20 shrink-0"
+          className="text-center text-xl"
         />
-        <input
+        <Campo
+          rotulo="Nome"
           required
           autoFocus
           maxLength={40}
           value={nome}
           onChange={(e) => setNome(e.target.value)}
-          placeholder="Nome"
-          aria-label="Nome da categoria"
-          className={campo}
+          placeholder="ex: Mercado"
+          classeCaixa="min-w-0 flex-1"
         />
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-        <label className="flex items-center gap-2">
+      <div className="flex min-h-11 flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs font-medium text-suave">
           Cor
           <input
             type="color"
             value={cor || '#888888'}
             onChange={(e) => setCor(e.target.value)}
-            className="h-7 w-10 cursor-pointer rounded border border-gray-200 bg-transparent dark:border-gray-700"
+            className="h-9 w-12 cursor-pointer rounded-card border border-borda bg-campo"
           />
         </label>
-        {cor && (
-          <button type="button" onClick={() => setCor('')} className="underline">
-            sem cor
-          </button>
+        {cor ? (
+          <Botao type="button" variante="fantasma" tamanho="sm" onClick={() => setCor('')}>
+            Usar cor automática
+          </Botao>
+        ) : (
+          <span className="text-xs text-tenue">Sem cor: o app escolhe uma estável.</span>
         )}
-        <span className="flex-1" />
-        <button type="button" onClick={aoCancelar} className="px-2 py-2 text-gray-400">
-          cancelar
-        </button>
-        <button type="submit" disabled={ocupado || !nome.trim()} className={botao}>
+      </div>
+      <div className="flex gap-2 pt-2">
+        <Botao type="button" variante="fantasma" className="flex-1" onClick={aoCancelar}>
+          Cancelar
+        </Botao>
+        <Botao type="submit" className="flex-1" carregando={ocupado} disabled={!nome.trim()}>
           {ocupado ? 'Salvando…' : 'Salvar'}
-        </button>
+        </Botao>
       </div>
     </form>
   )

@@ -59,18 +59,21 @@ const { createRoot } = await import('react-dom/client')
 const { createElement } = await import('react')
 const { Login } = await import('../features/auth/Login')
 const { Comecar } = await import('../features/orcamentos/Comecar')
-const { Mes } = await import('../features/mes/Mes')
 const { Lancar } = await import('../features/lancamentos/Lancar')
 const { Dashboard } = await import('../features/mes/Dashboard')
 const { Historico } = await import('../features/historico/Historico')
 const { ConfigOrcamento } = await import('../features/orcamentos/ConfigOrcamento')
-const { Seletor } = await import('../features/orcamentos/Seletor')
+const { SeletorSheet } = await import('../shell/SeletorSheet')
 const { Metas } = await import('../features/metas/Metas')
 const { Analises } = await import('../features/analises/Analises')
 const { Perfil } = await import('../features/perfil/Perfil')
 const { Acerto } = await import('../features/acerto/Acerto')
 const { Recorrentes } = await import('../features/recorrentes/Recorrentes')
 const { Busca } = await import('../features/busca/Busca')
+const { Inicio } = await import('../features/inicio/Inicio')
+const { Mais } = await import('../shell/Mais')
+const { ProvedorToast } = await import('../design')
+const { NavInferior } = await import('../shell/NavInferior')
 
 let falhas = 0
 
@@ -84,7 +87,8 @@ async function montar(nome: string, elemento: React.ReactElement, esperado: stri
     // deixa efeitos e promessas de dados resolverem.
     await new Promise((r) => setTimeout(r, 300))
 
-    const texto = alvo.textContent ?? ''
+    // lê o body inteiro: Sheet renderiza em portal fora do alvo.
+    const texto = dom.window.document.body.textContent ?? ''
     const faltando = esperado.filter((e) => !texto.includes(e))
     if (faltando.length > 0) {
       falhas++
@@ -154,18 +158,6 @@ await montar(
   ['Saiu', 'Entrou', 'Mercado', 'Digite o valor'],
 )
 
-// O caso que mais quebra: mês sem nenhum lançamento.
-await montar(
-  'mês vazio não quebra',
-  createElement(Mes, {
-    orcamento: ORCAMENTO,
-    categorias: CATEGORIAS,
-    membros: [MEMBRO],
-    aoFechar: () => {},
-  }),
-  ['Nada em', 'Lançamentos', 'Metas', 'exportar CSV'],
-)
-
 await montar(
   'dashboard vazio não quebra',
   createElement(Dashboard, {
@@ -188,6 +180,27 @@ const CTX = {
   ocultar: false,
 }
 const nada = () => {}
+await montar('início vazio não quebra', createElement(Inicio, CTX), ['Início', 'Saldo do mês'])
+await montar(
+  'mais lista as telas',
+  createElement(Mais, { aoIr: nada, tema: 'escuro', aoTrocarTema: nada, aoSair: nada }),
+  ['Metas', 'Acerto de contas', 'Recorrentes', 'Histórico', 'Busca', 'Configurações', 'Perfil'],
+)
+await montar(
+  'nav inferior',
+  createElement(NavInferior, { vista: 'metas', aoIr: nada, aoLancar: nada }),
+  ['Início', 'Mês', 'Análises', 'Mais'],
+)
+// lançar dentro do provider de toast (como no App)
+await montar(
+  'lançar com toast',
+  createElement(
+    ProvedorToast,
+    null,
+    createElement(Lancar, { ledgerId: 'l1', categorias: CATEGORIAS, usuarioId: 'u1', aoLancar: nada }),
+  ),
+  ['Saiu', 'Digite o valor'],
+)
 await montar('histórico', createElement(Historico, CTX), ['Histórico'])
 await montar('busca', createElement(Busca, CTX), ['Busca'])
 await montar('metas', createElement(Metas, CTX), ['Metas'])
@@ -201,7 +214,9 @@ await montar(
 )
 await montar(
   'seletor',
-  createElement(Seletor, {
+  createElement(SeletorSheet, {
+    aberto: true,
+    aoFechar: nada,
     orcamentos: [ORCAMENTO],
     atualId: 'l1',
     aoTrocar: nada,

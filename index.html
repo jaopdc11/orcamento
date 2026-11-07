@@ -3,23 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#030712" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#060910" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#060910" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
     <title>Orçamento</title>
     <script>
-      // Aplica o tema ANTES do render pra não piscar branco (segue o sistema até o usuário escolher).
+      // Aplica o tema ANTES do render pra não piscar. Escuro é o padrão; claro só
+      // se o usuário escolheu (mesma regra de src/lib/tema.ts).
+      var escuro = true
       try {
-        var t = localStorage.getItem('orcamento:tema')
-        var escuro = t ? t === 'escuro' : matchMedia('(prefers-color-scheme: dark)').matches
-        if (escuro) document.documentElement.classList.add('dark')
+        escuro = localStorage.getItem('orcamento:tema') !== 'claro'
       } catch (e) {}
+      if (escuro) document.documentElement.classList.add('dark')
+      else {
+        var ms = document.querySelectorAll('meta[name="theme-color"]')
+        for (var i = 0; i < ms.length; i++) ms[i].setAttribute('content', '#f4f6f9')
+      }
     </script>
   </head>
   <body>

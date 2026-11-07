@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, avisarSessao, type Usuario } from '@/lib/api'
+import { Aviso, Botao, Campo, Icone, Selo, vibrar, CaixasCodigo } from '@/design'
 
 // Login por CÓDIGO de 6 dígitos, nunca por link.
 //
@@ -43,83 +44,76 @@ export function Login() {
         email: email.trim(),
         codigo: codigo.trim(),
       })
+      vibrar('sucesso')
       avisarSessao(usuario) // o useSessao troca a tela
     } catch (e) {
+      vibrar('erro')
       setErro(e instanceof Error ? e.message : 'Código errado ou vencido. Peça outro.')
       setOcupado(false)
     }
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center px-6 py-10">
-      <div className="w-full max-w-sm">
-      <h1 className="mb-1 text-2xl font-semibold">Orçamento</h1>
-      <p className="mb-8 text-sm text-apagado">
-        {etapa === 'email'
-          ? 'Entre com seu e-mail. Chega um código de 6 dígitos.'
-          : `Código enviado para ${email}.`}
-      </p>
+    // Tela fora do shell: ela mesma cuida da safe-area (notch/home bar).
+    <div className="flex min-h-[100dvh] flex-col bg-fundo px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))]">
+      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center">
+        <div className="animate-subir">
+          <span className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-card border border-borda bg-superficie text-acento shadow-card">
+            <Icone n="wallet" className="h-6 w-6" />
+          </span>
+          <Selo tom="acento">{etapa === 'email' ? 'Entrar' : 'Confirmar'}</Selo>
+          <h1 className="mt-1.5 font-display text-4xl font-semibold tracking-tight text-texto">Orçamento</h1>
+          <p className="mb-8 mt-2 text-sm text-suave">
+            {etapa === 'email' ? (
+              'Entre com seu e-mail. Chega um código de 6 dígitos.'
+            ) : (
+              <>
+                Código enviado para <span className="font-medium text-texto">{email}</span>.
+              </>
+            )}
+          </p>
+        </div>
 
-      {etapa === 'email' ? (
-        <form onSubmit={pedirCodigo} className="flex flex-col gap-3">
-          <input
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            required
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@email.com"
-            className="rounded-xl border border-borda bg-painel px-4 py-3 text-base outline-none focus:border-primaria"
-          />
-          <button
-            type="submit"
-            disabled={ocupado}
-            className="rounded-xl bg-primaria px-4 py-3 font-semibold text-white disabled:opacity-50"
-          >
-            {ocupado ? 'Enviando…' : 'Receber código'}
-          </button>
-        </form>
-      ) : (
-        <form onSubmit={conferirCodigo} className="flex flex-col gap-3">
-          <input
-            type="text"
-            inputMode="numeric"
-            // faz iOS e Android sugerirem o código direto do teclado —
-            // é o que derruba a fricção pra perto de zero.
-            autoComplete="one-time-code"
-            pattern="[0-9]*"
-            maxLength={6}
-            required
-            autoFocus
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
-            placeholder="000000"
-            className="rounded-xl border border-borda bg-painel px-4 py-3 text-center text-3xl tracking-[0.4em] outline-none focus:border-primaria"
-          />
-          <button
-            type="submit"
-            disabled={ocupado || codigo.length < 6}
-            className="rounded-xl bg-primaria px-4 py-3 font-semibold text-white disabled:opacity-50"
-          >
-            {ocupado ? 'Conferindo…' : 'Entrar'}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEtapa('email')
-              setCodigo('')
-              setErro(null)
-            }}
-            className="py-2 text-sm text-apagado"
-          >
-            Usar outro e-mail
-          </button>
-        </form>
-      )}
+        {etapa === 'email' ? (
+          <form key="email" onSubmit={pedirCodigo} className="flex animate-subir flex-col gap-3">
+            <Campo
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="voce@email.com"
+              aria-label="E-mail"
+              className="min-h-14 text-lg sm:text-base"
+            />
+            <Botao type="submit" tamanho="lg" cheio carregando={ocupado}>
+              {ocupado ? 'Enviando…' : 'Receber código'}
+            </Botao>
+          </form>
+        ) : (
+          <form key="codigo" onSubmit={conferirCodigo} className="flex animate-subir flex-col gap-3">
+            <CaixasCodigo valor={codigo} aoMudar={setCodigo} autoFocus erro={!!erro} />
+            <Botao type="submit" tamanho="lg" cheio carregando={ocupado} disabled={ocupado || codigo.length < 6} className="mt-2">
+              {ocupado ? 'Conferindo…' : 'Entrar'}
+            </Botao>
+            <Botao
+              type="button"
+              variante="fantasma"
+              cheio
+              onClick={() => {
+                setEtapa('email')
+                setCodigo('')
+                setErro(null)
+              }}
+            >
+              Usar outro e-mail
+            </Botao>
+          </form>
+        )}
 
-      {erro && <p className="mt-4 text-sm text-saida">{erro}</p>}
+        {erro && <Aviso className="mt-4 animate-fade">{erro}</Aviso>}
       </div>
     </div>
   )

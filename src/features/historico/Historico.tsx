@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CabecalhoTela } from '@/lib/ui'
-import { Icone, type NomeIcone } from '@/lib/icones'
+import {
+  Aviso,
+  Botao,
+  CabecalhoTela,
+  Chip,
+  EsqueletoLista,
+  FileiraChips,
+  Icone,
+  Selo,
+  Vazio,
+  cx,
+  type NomeIcone,
+} from '@/design'
 import { comAtraso, ouvirOrcamento } from '@/lib/eventos'
 import { mapaDeMembros, nomeDoMembro } from '@/lib/membros'
 import { formatar } from '@/lib/dinheiro'
@@ -42,6 +53,51 @@ const FRASE: Record<TipoAtividade, { verbo: string; icone: NomeIcone }> = {
 // Mercado"); com o olho fechado o valor tem que sumir dele também.
 const VALOR = /-?R\$\s?[\d.]+,\d{2}/g
 const esconder = (txt: string, ocultar: boolean) => (ocultar ? txt.replace(VALOR, 'R$ ••••') : txt)
+
+/** Família de atividade: dá o filtro por tipo e a tinta do ícone. */
+type Familia = 'lancamento' | 'meta' | 'categoria' | 'recorrente' | 'pessoas'
+const familia = (t: string): Familia => {
+  if (t.startsWith('lancamento')) return 'lancamento'
+  if (t.startsWith('meta') || t.startsWith('economia')) return 'meta'
+  if (t.startsWith('categoria')) return 'categoria'
+  if (t.startsWith('recorrente')) return 'recorrente'
+  return 'pessoas' // membro, convite, orçamento: quem está no grupo e como ele se chama
+}
+const FAMILIAS: Array<{ id: Familia | ''; rotulo: string }> = [
+  { id: '', rotulo: 'Tudo' },
+  { id: 'lancamento', rotulo: 'Lançamentos' },
+  { id: 'meta', rotulo: 'Metas' },
+  { id: 'categoria', rotulo: 'Categorias' },
+  { id: 'recorrente', rotulo: 'Recorrentes' },
+  { id: 'pessoas', rotulo: 'Pessoas' },
+]
+
+/** Tinta do ícone: apagar é o único evento que merece chamar atenção. */
+function tintaDoIcone(t: string): string {
+  if (t === 'lancamento.apagado' || t.endsWith('removido') || t.endsWith('removida') || t === 'membro.saiu')
+    return 'bg-tinta-perigo text-perigo'
+  if (t === 'lancamento.criado') return 'bg-tinta-acento text-acento'
+  return 'bg-superficie-alta text-suave'
+}
+
+/** Rótulo do grupo do dia: 'Hoje', 'Ontem' ou 'qua, 03/11'. */
+function rotuloDoDia(dia: string, agora = new Date()): string {
+  const ontem = new Date(agora)
+  ontem.setDate(agora.getDate() - 1)
+  if (dia === diaLocal(agora)) return 'Hoje'
+  if (dia === diaLocal(ontem)) return 'Ontem'
+  const [a, m, d] = dia.split('-').map(Number)
+  const data = new Date(a!, m! - 1, d!)
+  const semana = data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
+  const curta = data.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    ...(a !== agora.getFullYear() ? { year: '2-digit' } : {}),
+  })
+  return `${semana}, ${curta}`
+}
+
+const horaDe = (iso: string) => new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 const diaLocal = (d: Date) => d.toLocaleDateString('en-CA')
 
@@ -160,76 +216,142 @@ export function Historico({ orcamento, usuarioId, membros, categorias, ocultar }
     }
   }
 
+  const [filtroFamilia, setFiltroFamilia] = useState<Familia | ''>('')
+  const [filtroMembro, setFiltroMembro] = useState('')
+
+  // O filtro é local, sobre o que já veio: a API do histórico não filtra e não
+  // vamos mexer no contrato. "Carregar mais" continua trazendo do servidor.
+  const grupos = useMemo(() => {
+    const filtrados = itens.filter(
+      (a) => (!filtroFamilia || familia(a.tipo) === filtroFamilia) && (!filtroMembro || a.user_id === filtroMembro),
+    )
+    const porDia: Array<{ dia: string; itens: Atividade[] }> = []
+    for (const a of filtrados) {
+      const dia = diaLocal(new Date(a.created_at))
+      const ultimo = porDia[porDia.length - 1]
+      if (ultimo?.dia === dia) ultimo.itens.push(a)
+      else porDia.push({ dia, itens: [a] })
+    }
+    return porDia
+  }, [itens, filtroFamilia, filtroMembro])
+
+  const filtrando = !!filtroFamilia || !!filtroMembro
+
   return (
     <div>
-      <CabecalhoTela titulo="Histórico" subtitulo="Quem fez o quê neste orçamento" />
+      <CabecalhoTela selo="Atividade" titulo="Histórico" descricao="Quem fez o quê neste orçamento" />
 
-      {erro && (
-        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
-          {erro}
-        </p>
-      )}
-
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900 sm:p-3">
-        {carregando ? (
-          <p className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">carregando…</p>
-        ) : itens.length === 0 ? (
-          <div className="py-10 text-center">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-gray-300 dark:bg-gray-800 dark:text-gray-600">
-              <Icone n="history" className="h-5 w-5" />
-            </div>
-            <p className="text-sm text-gray-400 dark:text-gray-500">Nada por aqui ainda</p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-            {itens.map((a) => {
-              const frase = FRASE[a.tipo] ?? { verbo: a.tipo, icone: 'history' as NomeIcone }
-              const quem = nomeDoMembro(porMembro.get(a.user_id), usuarioId)
-              const detalhe =
-                a.tipo === 'lancamento.editado'
-                  ? detalheDaEdicao(a, {
-                      ocultar,
-                      categoria: nomeCategoria,
-                      membro: (id) => nomeDoMembro(porMembro.get(id)),
-                    })
-                  : null
-              return (
-                <li key={a.id} className="flex gap-3 px-2 py-2.5">
-                  <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                      a.tipo === 'lancamento.apagado'
-                        ? 'bg-red-50 text-red-500 dark:bg-red-950 dark:text-red-400'
-                        : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                    }`}
-                  >
-                    <Icone n={frase.icone} className="h-3.5 w-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-gray-800 dark:text-gray-200">
-                      <span className="font-medium">{quem}</span> {frase.verbo}{' '}
-                      <span className="text-gray-600 dark:text-gray-400">{esconder(a.resumo, ocultar)}</span>
-                    </p>
-                    {detalhe && (
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{detalhe}</p>
-                    )}
-                    <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">{quando(a.created_at)}</p>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-
-        {proximo && !carregando && (
-          <button
-            onClick={() => void carregarMais()}
-            disabled={carregandoMais}
-            className="mt-2 w-full rounded-md py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-blue-400 dark:hover:bg-gray-800"
-          >
-            {carregandoMais ? 'Carregando…' : 'Carregar mais'}
-          </button>
+      <div className="mb-4 space-y-2">
+        <FileiraChips>
+          {FAMILIAS.map((f) => (
+            <Chip key={f.id || 'tudo'} ativo={filtroFamilia === f.id} aoTocar={() => setFiltroFamilia(f.id)}>
+              {f.rotulo}
+            </Chip>
+          ))}
+        </FileiraChips>
+        {membros.length > 1 && (
+          <FileiraChips>
+            <Chip ativo={!filtroMembro} aoTocar={() => setFiltroMembro('')} icone={<Icone n="users" className="h-3.5 w-3.5" />}>
+              Todos
+            </Chip>
+            {membros.map((m) => (
+              <Chip key={m.user_id} ativo={filtroMembro === m.user_id} aoTocar={() => setFiltroMembro(m.user_id)}>
+                {nomeDoMembro(m, usuarioId)}
+              </Chip>
+            ))}
+          </FileiraChips>
         )}
       </div>
+
+      {erro && (
+        <Aviso className="mb-4" aoTentarDeNovo={() => void recarregar()}>
+          {erro}
+        </Aviso>
+      )}
+
+      {carregando ? (
+        <EsqueletoLista linhas={6} />
+      ) : grupos.length === 0 ? (
+        filtrando ? (
+          <Vazio
+            icone="history"
+            titulo="Nada com esse filtro no que já carregou."
+            descricao={proximo ? 'Pode estar mais pra trás: carregue mais ou limpe o filtro.' : undefined}
+            acao={
+              <Botao
+                variante="secundario"
+                onClick={() => {
+                  setFiltroFamilia('')
+                  setFiltroMembro('')
+                }}
+              >
+                Limpar filtros
+              </Botao>
+            }
+          />
+        ) : (
+          <Vazio icone="history" titulo="Nada aconteceu por aqui ainda. O primeiro lançamento já aparece neste feed." />
+        )
+      ) : (
+        <div className="cascata space-y-5">
+          {grupos.map((g) => (
+            <section key={g.dia}>
+              <div className="mb-2 flex items-baseline justify-between px-1">
+                <Selo>{rotuloDoDia(g.dia)}</Selo>
+                <span className="font-mono text-[11px] text-tenue">{g.itens.length}</span>
+              </div>
+              <ul className="divide-y divide-borda overflow-hidden rounded-card border border-borda bg-superficie shadow-card">
+                {g.itens.map((a) => {
+                  const frase = FRASE[a.tipo] ?? { verbo: a.tipo, icone: 'history' as NomeIcone }
+                  const quem = nomeDoMembro(porMembro.get(a.user_id), usuarioId)
+                  const detalhe =
+                    a.tipo === 'lancamento.editado'
+                      ? detalheDaEdicao(a, {
+                          ocultar,
+                          categoria: nomeCategoria,
+                          membro: (id) => nomeDoMembro(porMembro.get(id)),
+                        })
+                      : null
+                  return (
+                    <li key={a.id} className="flex min-h-14 gap-3 px-4 py-3">
+                      <span
+                        className={cx(
+                          'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
+                          tintaDoIcone(a.tipo),
+                        )}
+                      >
+                        <Icone n={frase.icone} className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-texto">
+                          <span className="font-semibold">{quem}</span> {frase.verbo}{' '}
+                          <span className="text-suave">{esconder(a.resumo, ocultar)}</span>
+                        </p>
+                        {detalhe && <p className="mt-0.5 text-xs text-suave">{detalhe}</p>}
+                      </div>
+                      <time
+                        dateTime={a.created_at}
+                        title={quando(a.created_at)}
+                        className="mt-0.5 shrink-0 font-mono text-[11px] text-tenue"
+                      >
+                        {horaDe(a.created_at)}
+                      </time>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+
+      {proximo && !carregando && (
+        <div className="mt-4 flex justify-center">
+          <Botao variante="fantasma" carregando={carregandoMais} onClick={() => void carregarMais()}>
+            Carregar mais antigos
+          </Botao>
+        </div>
+      )}
     </div>
   )
 }

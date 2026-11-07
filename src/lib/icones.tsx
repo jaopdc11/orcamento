@@ -32,6 +32,12 @@ type Nome =
   | 'bell'
   | 'check'
   | 'pencil'
+  | 'home'
+  | 'calendar'
+  | 'more'
+  | 'backspace'
+  | 'login'
+  | 'alert'
 
 const PATHS: Record<Nome, React.ReactNode> = {
   grid: (
@@ -206,6 +212,42 @@ const PATHS: Record<Nome, React.ReactNode> = {
     <>
       <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
       <path d="m15 5 4 4" />
+    </>
+  ),
+  home: (
+    <>
+      <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z" />
+    </>
+  ),
+  calendar: (
+    <>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ),
+  backspace: (
+    <>
+      <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2Z" />
+      <path d="m18 9-6 6M12 9l6 6" />
+    </>
+  ),
+  login: (
+    <>
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <path d="m10 17 5-5-5-5M15 12H3" />
+    </>
+  ),
+  alert: (
+    <>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 8v4M12 16h.01" />
     </>
   ),
 }

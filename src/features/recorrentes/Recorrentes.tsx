@@ -1,10 +1,30 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CabecalhoTela } from '@/lib/ui'
-import { Icone } from '@/lib/icones'
-import { formatar, formatarSeco, paraCentavos } from '@/lib/dinheiro'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import {
+  Aviso,
+  Badge,
+  Botao,
+  BotaoIcone,
+  CabecalhoTela,
+  Campo,
+  Cartao,
+  Chip,
+  EsqueletoLista,
+  Icone,
+  IconeCategoria,
+  Lista,
+  LinhaLista,
+  Select,
+  Selo,
+  Sheet,
+  Tabs,
+  Valor,
+  Vazio,
+  useToast,
+  vibrar, TecladoValor,
+} from '@/design'
 import { comAtraso, ouvirOrcamento } from '@/lib/eventos'
 import { mapaDeMembros, nomeDoMembro } from '@/lib/membros'
-import type { ContextoOrcamento, Especie, Recorrente } from '@/lib/tipos'
+import type { Categoria, ContextoOrcamento, Especie, Recorrente } from '@/lib/tipos'
 import {
   apagarRecorrente,
   criarRecorrente,
@@ -15,15 +35,14 @@ import {
 
 export type Props = ContextoOrcamento
 
-const OCULTO = 'R$ ••••'
-
 const msg = (e: unknown) => (e instanceof Error ? e.message : 'Não deu certo.')
 
 export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar }: Props) {
   const ledgerId = orcamento.id
+  const toast = useToast()
   const [lista, setLista] = useState<Recorrente[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
-  // null = nenhum formulário; 'novo' = criando; senão o recorrente em edição
+  // null = Sheet fechado; 'novo' = criando; senão o recorrente em edição
   const [editando, setEditando] = useState<Recorrente | 'novo' | null>(null)
 
   const recarregar = useCallback(async () => {
@@ -53,7 +72,10 @@ export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar
   }, [ledgerId, recarregar])
 
   const porMembro = useMemo(() => mapaDeMembros(membros), [membros])
-  const nomeCategoria = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias])
+  const porCategoria = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias])
+
+  // Ordem do calendário: a pessoa pensa "o que cai primeiro no mês".
+  const ordenada = useMemo(() => [...(lista ?? [])].sort((a, b) => a.dia_do_mes - b.dia_do_mes), [lista])
 
   // Quanto já está "comprometido" todo mês: é a pergunta que faz alguém abrir esta tela.
   const totais = useMemo(() => {
@@ -61,187 +83,142 @@ export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar
     return {
       saida: ativos.filter((r) => r.kind === 'expense').reduce((s, r) => s + r.amount_cents, 0),
       entrada: ativos.filter((r) => r.kind === 'income').reduce((s, r) => s + r.amount_cents, 0),
+      ativos: ativos.length,
     }
   }, [lista])
-
-  const dinheiro = (c: number) => (ocultar ? OCULTO : formatar(c))
 
   async function alternar(r: Recorrente) {
     try {
       await editarRecorrente(ledgerId, r.id, { ativo: !r.ativo })
+      vibrar('leve')
+      toast.mostrar(r.ativo ? `${r.descricao} pausado` : `${r.descricao} retomado`, { tom: 'info' })
       await recarregar()
     } catch (e) {
       setErro(msg(e))
     }
   }
 
+  const botaoNovo = (
+    <Botao tamanho="sm" onClick={() => setEditando('novo')} icone={<Icone n="plus" className="h-4 w-4" />}>
+      Novo
+    </Botao>
+  )
+
   return (
     <div className="mx-auto max-w-2xl">
-      <CabecalhoTela titulo="Recorrentes" subtitulo="Contas que se repetem todo mês entram sozinhas no mês" />
+      <CabecalhoTela
+        selo="Todo mês"
+        titulo="Recorrentes"
+        descricao="Contas que se repetem entram sozinhas no mês"
+        acao={lista && lista.length > 0 ? botaoNovo : undefined}
+      />
 
       {erro && (
-        <div className="mb-4 rounded-lg border border-saida/40 p-3 text-sm text-saida">
-          {erro}{' '}
-          <button onClick={() => void recarregar()} className="underline">
-            tentar de novo
-          </button>
-        </div>
-      )}
-
-      {lista && lista.length > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-3">
-          <div className="rounded-lg border border-borda bg-painel p-3">
-            <p className="text-xs text-apagado">Saídas fixas / mês</p>
-            <p className="text-base font-semibold text-saida">{dinheiro(totais.saida)}</p>
-          </div>
-          <div className="rounded-lg border border-borda bg-painel p-3">
-            <p className="text-xs text-apagado">Entradas fixas / mês</p>
-            <p className="text-base font-semibold text-entrada">{dinheiro(totais.entrada)}</p>
-          </div>
-        </div>
-      )}
-
-      {editando === 'novo' ? (
-        <Formulario
-          {...{ ledgerId, membros, categorias, usuarioId }}
-          aoFechar={() => setEditando(null)}
-          aoSalvar={async () => {
-            setEditando(null)
-            await recarregar()
-          }}
-        />
-      ) : (
-        <button
-          onClick={() => setEditando('novo')}
-          className="mb-4 flex w-full items-center justify-center gap-2 rounded-lg bg-primaria px-4 py-2.5 text-sm font-semibold text-white"
-        >
-          <Icone n="plus" /> Novo recorrente
-        </button>
+        <Aviso className="mb-4" aoTentarDeNovo={() => void recarregar()}>
+          {erro}
+        </Aviso>
       )}
 
       {!lista ? (
-        !erro && <p className="py-8 text-center text-sm text-apagado">carregando…</p>
+        !erro && <EsqueletoLista linhas={5} />
       ) : lista.length === 0 ? (
-        <div className="rounded-lg border border-borda bg-painel py-10 text-center">
-          <Icone n="repeat" className="mx-auto mb-2 h-5 w-5 text-apagado" />
-          <p className="text-sm text-apagado">Nada recorrente ainda. Aluguel, internet, salário…</p>
-        </div>
+        <Cartao>
+          <Vazio
+            icone="repeat"
+            titulo="Nada recorrente ainda."
+            descricao="Aluguel, internet, salário: cadastre uma vez e ele cai sozinho todo mês."
+            acao={
+              <Botao onClick={() => setEditando('novo')} icone={<Icone n="plus" className="h-4 w-4" />}>
+                Novo recorrente
+              </Botao>
+            }
+          />
+        </Cartao>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {lista.map((r) =>
-            editando !== 'novo' && editando?.id === r.id ? (
-              <li key={r.id}>
-                <Formulario
-                  {...{ ledgerId, membros, categorias, usuarioId }}
-                  atual={r}
-                  aoFechar={() => setEditando(null)}
-                  aoSalvar={async () => {
-                    setEditando(null)
-                    await recarregar()
-                  }}
-                />
-              </li>
-            ) : (
-              <Linha
-                key={r.id}
-                r={r}
-                categoria={r.category_id ? nomeCategoria.get(r.category_id) : undefined}
-                pagador={r.paid_by ? nomeDoMembro(porMembro.get(r.paid_by), usuarioId) : null}
-                valor={dinheiro(r.amount_cents)}
-                aoEditar={() => setEditando(r)}
-                aoAlternar={() => void alternar(r)}
-                aoApagar={async () => {
-                  try {
-                    await apagarRecorrente(ledgerId, r.id)
-                    await recarregar()
-                  } catch (e) {
-                    setErro(msg(e))
-                  }
-                }}
-              />
-            ),
-          )}
-        </ul>
+        <div className="space-y-6">
+          <div className="cascata grid grid-cols-2 gap-3">
+            <Cartao>
+              <Selo>Saídas fixas / mês</Selo>
+              <Valor centavos={totais.saida} tipo="saida" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+            </Cartao>
+            <Cartao>
+              <Selo>Entradas fixas / mês</Selo>
+              <Valor centavos={totais.entrada} tipo="entrada" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+            </Cartao>
+          </div>
+
+          <section>
+            <Selo className="mb-2">
+              <span className="font-mono">{totais.ativos}</span> ativo{totais.ativos === 1 ? '' : 's'} ·{' '}
+              <span className="font-mono">{lista.length - totais.ativos}</span> pausado{lista.length - totais.ativos === 1 ? '' : 's'}
+            </Selo>
+            <Lista cascata>
+              {ordenada.map((r) => {
+                const cat = r.category_id ? porCategoria.get(r.category_id) : undefined
+                const pagador = r.paid_by ? nomeDoMembro(porMembro.get(r.paid_by), usuarioId) : null
+                return (
+                  <LinhaLista
+                    key={r.id}
+                    apagada={!r.ativo}
+                    inicio={<DiaDoMes dia={r.dia_do_mes} />}
+                    titulo={r.descricao}
+                    subtitulo={
+                      <>
+                        {cat ? `${cat.emoji ?? ''} ${cat.nome}`.trim() : 'sem categoria'}
+                        {pagador && ` · ${pagador}`}
+                      </>
+                    }
+                    fim={<Valor centavos={r.amount_cents} tipo={r.kind === 'income' ? 'entrada' : 'saida'} tamanho="sm" ocultar={ocultar} />}
+                    aoTocar={() => setEditando(r)}
+                    acoes={
+                      <Chip ativo={r.ativo} aoTocar={() => void alternar(r)} className="mx-1">
+                        {r.ativo ? 'ativo' : 'pausado'}
+                      </Chip>
+                    }
+                  />
+                )
+              })}
+            </Lista>
+            <p className="mt-2 text-xs text-tenue">Toque no chip pra pausar ou retomar; na linha pra editar.</p>
+          </section>
+        </div>
       )}
+
+      <SheetRecorrente
+        aberto={editando !== null}
+        atual={editando === 'novo' ? undefined : (editando ?? undefined)}
+        {...{ ledgerId, membros, categorias, usuarioId }}
+        aoFechar={() => setEditando(null)}
+        aoSalvar={async (texto) => {
+          vibrar('sucesso')
+          toast.mostrar(texto)
+          setEditando(null)
+          await recarregar()
+        }}
+        aoApagar={async (r) => {
+          await apagarRecorrente(ledgerId, r.id)
+          vibrar('aviso')
+          toast.mostrar(`${r.descricao} apagado`)
+          setEditando(null)
+          await recarregar()
+        }}
+      />
     </div>
   )
 }
 
-function Linha({
-  r,
-  categoria,
-  pagador,
-  valor,
-  aoEditar,
-  aoAlternar,
-  aoApagar,
-}: {
-  r: Recorrente
-  categoria: { nome: string; emoji: string | null } | undefined
-  pagador: string | null
-  valor: string
-  aoEditar: () => void
-  aoAlternar: () => void
-  aoApagar: () => Promise<void>
-}) {
-  // confirmação dentro da linha: o viewer/PWA não garante confirm() nativo
-  const [confirmando, setConfirmando] = useState(false)
-
+/** Quadradinho "dia 05": âncora visual do calendário no início da linha. */
+function DiaDoMes({ dia }: { dia: number }) {
   return (
-    <li className={`rounded-lg border border-borda bg-painel p-3 ${r.ativo ? '' : 'opacity-60'}`}>
-      <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-md bg-fundo text-xs leading-none">
-          <span className="text-[10px] text-apagado">dia</span>
-          <span className="font-semibold">{r.dia_do_mes}</span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{r.descricao}</p>
-          <p className="truncate text-xs text-apagado">
-            {categoria ? `${categoria.emoji ?? ''} ${categoria.nome}`.trim() : 'sem categoria'}
-            {pagador && ` · pago por ${pagador}`}
-            {!r.ativo && ' · pausado'}
-          </p>
-        </div>
-        <p className={`shrink-0 text-sm font-semibold ${r.kind === 'income' ? 'text-entrada' : 'text-saida'}`}>
-          {r.kind === 'income' ? '+' : '−'}
-          {valor}
-        </p>
-      </div>
-
-      <div className="mt-2 flex flex-wrap justify-end gap-1 text-xs">
-        {confirmando ? (
-          <>
-            <span className="mr-auto self-center text-apagado">Apagar? Os lançamentos já gerados ficam.</span>
-            <button onClick={() => setConfirmando(false)} className="rounded px-2 py-1 text-apagado">
-              cancelar
-            </button>
-            <button onClick={() => void aoApagar()} className="rounded bg-saida px-2 py-1 font-semibold text-white">
-              apagar
-            </button>
-          </>
-        ) : (
-          <>
-            <button onClick={aoAlternar} className="rounded px-2 py-1 text-apagado hover:text-current">
-              {r.ativo ? 'pausar' : 'retomar'}
-            </button>
-            <button onClick={aoEditar} className="flex items-center gap-1 rounded px-2 py-1 text-apagado hover:text-current">
-              <Icone n="pencil" className="h-3 w-3" /> editar
-            </button>
-            <button
-              onClick={() => setConfirmando(true)}
-              className="flex items-center gap-1 rounded px-2 py-1 text-apagado hover:text-saida"
-              aria-label="apagar"
-            >
-              <Icone n="trash" className="h-3 w-3" />
-            </button>
-          </>
-        )}
-      </div>
-    </li>
+    <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-[10px] border border-borda bg-campo leading-none">
+      <span className="text-[9px] uppercase tracking-[.15em] text-tenue">dia</span>
+      <span className="mt-0.5 font-mono text-sm font-semibold text-texto">{String(dia).padStart(2, '0')}</span>
+    </span>
   )
 }
 
-function Formulario({
+function SheetRecorrente({
+  aberto,
   ledgerId,
   membros,
   categorias,
@@ -249,28 +226,44 @@ function Formulario({
   atual,
   aoFechar,
   aoSalvar,
+  aoApagar,
 }: Pick<Props, 'membros' | 'categorias' | 'usuarioId'> & {
+  aberto: boolean
   ledgerId: string
   atual?: Recorrente
   aoFechar: () => void
-  aoSalvar: () => Promise<void>
+  aoSalvar: (texto: string) => Promise<void>
+  aoApagar: (r: Recorrente) => Promise<void>
 }) {
-  const [descricao, setDescricao] = useState(atual?.descricao ?? '')
-  const [valor, setValor] = useState(atual ? formatarSeco(atual.amount_cents) : '')
-  const [kind, setKind] = useState<Especie>(atual?.kind ?? 'expense')
-  const [categoria, setCategoria] = useState<string>(atual?.category_id ?? '')
-  const [pagador, setPagador] = useState<string>(atual?.paid_by ?? '')
-  const [dia, setDia] = useState(atual?.dia_do_mes ?? 5)
+  const [descricao, setDescricao] = useState('')
+  const [centavos, setCentavos] = useState(0)
+  const [kind, setKind] = useState<Especie>('expense')
+  const [categoria, setCategoria] = useState('')
+  const [pagador, setPagador] = useState('')
+  const [dia, setDia] = useState(5)
   const [salvando, setSalvando] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
+
+  // Sheet fica montado: cada abertura recomeça do recorrente tocado (ou do zero).
+  useEffect(() => {
+    if (!aberto) return
+    setDescricao(atual?.descricao ?? '')
+    setCentavos(atual?.amount_cents ?? 0)
+    setKind(atual?.kind ?? 'expense')
+    setCategoria(atual?.category_id ?? '')
+    setPagador(atual?.paid_by ?? '')
+    setDia(atual?.dia_do_mes ?? 5)
+    setSalvando(false)
+    setConfirmando(false)
+    setErro(null)
+  }, [aberto, atual])
 
   const opcoes = useMemo(() => categorias.filter((c) => c.kind === kind), [categorias, kind])
 
-  async function salvar(e: React.FormEvent) {
-    e.preventDefault()
-    const centavos = paraCentavos(valor)
+  async function salvar() {
     if (!descricao.trim()) return setErro('Dê um nome.')
-    if (!centavos || centavos <= 0) return setErro('Valor inválido.')
+    if (centavos <= 0) return setErro('Digite o valor.')
     const dados: DadosRecorrente = {
       descricao: descricao.trim(),
       amount_cents: centavos,
@@ -284,104 +277,137 @@ function Formulario({
     try {
       if (atual) await editarRecorrente(ledgerId, atual.id, dados)
       else await criarRecorrente(ledgerId, dados)
-      await aoSalvar()
+      await aoSalvar(atual ? 'Recorrente salvo' : `${dados.descricao} entra todo dia ${dia}`)
+    } catch (e) {
+      vibrar('erro')
+      setErro(msg(e))
+      setSalvando(false)
+    }
+  }
+
+  async function apagar() {
+    if (!atual) return
+    setSalvando(true)
+    try {
+      await aoApagar(atual)
     } catch (e) {
       setErro(msg(e))
       setSalvando(false)
     }
   }
 
-  const campo = 'w-full rounded-md border border-borda bg-fundo px-3 py-2 text-sm'
+  const rodape = confirmando ? (
+    <>
+      <Botao variante="fantasma" className="flex-1" onClick={() => setConfirmando(false)}>
+        Voltar
+      </Botao>
+      <Botao variante="perigo" className="flex-1" carregando={salvando} onClick={() => void apagar()}>
+        Apagar de vez
+      </Botao>
+    </>
+  ) : (
+    <>
+      {atual && (
+        <BotaoIcone rotulo="apagar recorrente" onClick={() => setConfirmando(true)} className="text-perigo">
+          <Icone n="trash" className="h-5 w-5" />
+        </BotaoIcone>
+      )}
+      <Botao variante="fantasma" className="flex-1" onClick={aoFechar}>
+        Cancelar
+      </Botao>
+      <Botao className="flex-1" carregando={salvando} onClick={() => void salvar()}>
+        {atual ? 'Salvar' : 'Criar'}
+      </Botao>
+    </>
+  )
 
   return (
-    <form onSubmit={salvar} className="mb-4 flex flex-col gap-3 rounded-lg border border-borda bg-painel p-3">
-      <div className="flex rounded-md border border-borda p-0.5 text-sm">
-        {(['expense', 'income'] as const).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setKind(k)}
-            className={`flex-1 rounded px-3 py-1.5 ${kind === k ? 'bg-primaria font-semibold text-white' : 'text-apagado'}`}
-          >
-            {k === 'expense' ? 'Saída' : 'Entrada'}
-          </button>
+    <Sheet aberto={aberto} aoFechar={aoFechar} selo="Recorrentes" titulo={atual ? 'Editar recorrente' : 'Novo recorrente'} rodape={rodape} alto>
+      {confirmando ? (
+        <div className="animate-fade py-6 text-center">
+          <p className="text-sm font-medium text-texto">Apagar “{atual?.descricao}”?</p>
+          <p className="mt-1 text-sm text-suave">Os lançamentos já gerados ficam no histórico.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <Tabs
+            cheio
+            tom={kind === 'expense' ? 'saida' : 'entrada'}
+            abas={[
+              { id: 'expense', rotulo: 'Saída' },
+              { id: 'income', rotulo: 'Entrada' },
+            ]}
+            ativa={kind}
+            aoTrocar={setKind}
+          />
+
+          <Campo rotulo="Nome" value={descricao} maxLength={200} onChange={(e) => setDescricao(e.target.value)} placeholder="Aluguel" />
+
+          <TecladoValor centavos={centavos} aoMudar={setCentavos} tom={kind === 'expense' ? 'saida' : 'entrada'} rotulo="Valor todo mês" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Select rotulo="Todo dia" value={dia} onChange={(e) => setDia(Number(e.target.value))} className="font-mono">
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </Select>
+            <Select rotulo="Quem paga" value={pagador} onChange={(e) => setPagador(e.target.value)}>
+              <option value="">o pote</option>
+              {membros.map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  {nomeDoMembro(m, usuarioId)}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <EscolhaCategoria opcoes={opcoes} valor={categoria} aoMudar={setCategoria} />
+
+          {atual && (
+            <p className="flex items-center gap-2 text-xs text-tenue">
+              <Badge tom="atencao">aviso</Badge> A mudança vale para os meses que ainda não foram gerados.
+            </p>
+          )}
+          {erro && <p className="text-sm text-perigo">{erro}</p>}
+        </div>
+      )}
+    </Sheet>
+  )
+}
+
+/** Grade de categorias tocáveis (mesma linguagem do Lancar); "nenhuma" fica primeiro. */
+function EscolhaCategoria({ opcoes, valor, aoMudar }: { opcoes: Categoria[]; valor: string; aoMudar: (id: string) => void }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-medium text-suave">Categoria</p>
+      <div className="grid grid-cols-4 gap-2">
+        <BotaoCat ativo={valor === ''} aoTocar={() => aoMudar('')} rotulo="nenhuma">
+          <IconeCategoria categoria={null} tamanho="sm" />
+        </BotaoCat>
+        {opcoes.map((c) => (
+          <BotaoCat key={c.id} ativo={valor === c.id} aoTocar={() => aoMudar(c.id)} rotulo={c.nome}>
+            <IconeCategoria categoria={c} tamanho="sm" />
+          </BotaoCat>
         ))}
       </div>
+    </div>
+  )
+}
 
-      <label className="text-xs text-apagado">
-        Nome
-        <input
-          className={campo}
-          value={descricao}
-          maxLength={200}
-          onChange={(e) => setDescricao(e.target.value)}
-          placeholder="Aluguel"
-          autoFocus
-        />
-      </label>
-
-      <div className="grid grid-cols-2 gap-3">
-        <label className="text-xs text-apagado">
-          Valor (R$)
-          <input
-            className={campo}
-            inputMode="decimal"
-            value={valor}
-            onChange={(e) => setValor(e.target.value)}
-            placeholder="0,00"
-          />
-        </label>
-        <label className="text-xs text-apagado">
-          Todo dia
-          <select className={campo} value={dia} onChange={(e) => setDia(Number(e.target.value))}>
-            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <label className="text-xs text-apagado">
-        Categoria
-        <select className={campo} value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-          <option value="">sem categoria</option>
-          {opcoes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {`${c.emoji ?? ''} ${c.nome}`.trim()}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="text-xs text-apagado">
-        Quem paga
-        <select className={campo} value={pagador} onChange={(e) => setPagador(e.target.value)}>
-          <option value="">o pote (ninguém em especial)</option>
-          {membros.map((m) => (
-            <option key={m.user_id} value={m.user_id}>
-              {nomeDoMembro(m, usuarioId)}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {atual && <p className="text-xs text-apagado">A mudança vale para os meses que ainda não foram gerados.</p>}
-      {erro && <p className="text-xs text-saida">{erro}</p>}
-
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={aoFechar} className="rounded-md px-3 py-2 text-sm text-apagado">
-          cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={salvando}
-          className="rounded-md bg-primaria px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {salvando ? 'salvando…' : atual ? 'Salvar' : 'Criar'}
-        </button>
-      </div>
-    </form>
+function BotaoCat({ ativo, aoTocar, rotulo, children }: { ativo: boolean; aoTocar: () => void; rotulo: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={aoTocar}
+      aria-pressed={ativo}
+      className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-card border px-1 py-2 transition-[transform,border-color,background-color] duration-150 ease-suave active:scale-[0.97] ${
+        ativo ? 'border-acento bg-tinta-acento' : 'border-borda bg-campo'
+      }`}
+    >
+      {children}
+      <span className={`w-full truncate text-center text-[11px] ${ativo ? 'text-acento' : 'text-suave'}`}>{rotulo}</span>
+    </button>
   )
 }

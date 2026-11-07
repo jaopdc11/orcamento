@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CabecalhoTela } from '@/lib/ui'
-import { formatar } from '@/lib/dinheiro'
 import { deslocarMes, mesDe, mesPorExtenso } from '@/lib/datas'
 import { ouvirOrcamento } from '@/lib/eventos'
 import { mapaDeMembros, nomeDoMembro } from '@/lib/membros'
 import type { Acerto as TipoAcerto, ContextoOrcamento } from '@/lib/tipos'
+import {
+  Aviso,
+  BarraProgresso,
+  Botao,
+  BotaoIcone,
+  CabecalhoTela,
+  Campo,
+  Cartao,
+  Esqueleto,
+  Icone,
+  Selo,
+  Sheet,
+  TituloSecao,
+  Valor,
+  Vazio,
+  useToast,
+  vibrar,
+} from '@/design'
 import { buscarAcerto, salvarProporcoes } from './acerto.queries'
 
 export type Props = ContextoOrcamento & {
@@ -16,8 +32,8 @@ export function Acerto({ orcamento, usuarioId, membros, ocultar, aoMudar }: Prop
   const [mes, setMes] = useState(mesDe())
   const [dados, setDados] = useState<TipoAcerto | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [editando, setEditando] = useState(false)
   const porId = useMemo(() => mapaDeMembros(membros), [membros])
-  const din = (c: number) => (ocultar ? 'R$ ••••' : formatar(c))
   const nome = (id: string) => nomeDoMembro(porId.get(id), usuarioId)
 
   const carregar = useCallback(() => {
@@ -36,77 +52,155 @@ export function Acerto({ orcamento, usuarioId, membros, ocultar, aoMudar }: Prop
     [orcamento.id, carregar],
   )
 
+  const somaPesos = membros.reduce((s, m) => s + m.proporcao, 0)
+  const [principal, ...demais] = dados?.transferencias ?? []
+
   return (
     <div>
-      <CabecalhoTela titulo="Acerto de contas" subtitulo="Só despesas. Quem pagou vs. a parte de cada um." />
+      <CabecalhoTela
+        selo={mesPorExtenso(mes)}
+        titulo="Acerto de contas"
+        descricao="Só despesas. Quem pagou vs. a parte de cada um."
+      />
 
-      <div className="mb-4 flex items-center justify-between rounded-lg border border-borda bg-painel px-2 py-1">
-        <button onClick={() => setMes(deslocarMes(mes, -1))} className="px-3 py-1 text-xl" aria-label="mês anterior">
-          ‹
-        </button>
-        <span className="text-sm font-semibold">{mesPorExtenso(mes)}</span>
-        <button
-          onClick={() => setMes(deslocarMes(mes, 1))}
-          disabled={mes >= mesDe()}
-          className="px-3 py-1 text-xl disabled:opacity-20"
-          aria-label="próximo mês"
-        >
-          ›
-        </button>
+      <div className="mb-4 flex items-center justify-between rounded-card border border-borda bg-superficie px-1">
+        <BotaoIcone rotulo="mês anterior" onClick={() => setMes(deslocarMes(mes, -1))}>
+          <Icone n="chevronLeft" />
+        </BotaoIcone>
+        <span className="text-sm font-semibold capitalize text-texto">{mesPorExtenso(mes)}</span>
+        <BotaoIcone rotulo="próximo mês" onClick={() => setMes(deslocarMes(mes, 1))} disabled={mes >= mesDe()}>
+          <Icone n="chevronRight" />
+        </BotaoIcone>
       </div>
 
-      {erro && <p className="mb-4 text-sm text-saida">{erro}</p>}
-      {!dados && !erro && <p className="text-sm text-apagado">carregando…</p>}
+      {erro && (
+        <Aviso className="mb-4" aoTentarDeNovo={carregar}>
+          {erro}
+        </Aviso>
+      )}
+
+      {!dados && !erro && (
+        <div className="space-y-3">
+          <Esqueleto className="h-36 rounded-card" />
+          <Esqueleto className="h-48 rounded-card" />
+        </div>
+      )}
 
       {dados && (
-        <>
-          <section className="mb-4 rounded-lg border border-borda bg-painel p-4">
-            <p className="text-xs text-apagado">Despesas do mês</p>
-            <p className="text-2xl font-semibold tabular-nums">{din(dados.total_cents)}</p>
-            <div className="mt-3 space-y-2">
-              {dados.transferencias.length === 0 ? (
-                <p className="text-sm text-apagado">
-                  {dados.total_cents === 0 ? 'Nenhuma despesa neste mês.' : 'Tudo certo: ninguém deve nada.'}
+        <div className="cascata space-y-3">
+          {/* Herói: a resposta da tela é "quem paga quem". */}
+          <Cartao>
+            {principal ? (
+              <>
+                <Selo tom="acento">Pra zerar o mês</Selo>
+                <p className="mt-2 text-sm text-suave">
+                  <strong className="font-semibold text-texto">{nome(principal.de)}</strong> passa pra{' '}
+                  <strong className="font-semibold text-texto">{nome(principal.para)}</strong>
                 </p>
-              ) : (
-                dados.transferencias.map((t) => (
-                  <p key={`${t.de}-${t.para}`} className="rounded-md bg-fundo px-3 py-2 text-sm">
-                    <strong>{nome(t.de)}</strong> deve <strong className="tabular-nums">{din(t.valor_cents)}</strong> a{' '}
-                    <strong>{nome(t.para)}</strong>
-                  </p>
-                ))
-              )}
+                <Valor centavos={principal.valor_cents} tamanho="heroi" tipo="neutro" animar ocultar={ocultar} className="mt-1 block" />
+                {demais.length > 0 && (
+                  <ul className="mt-4 space-y-2 border-t border-borda pt-3">
+                    {demais.map((t) => (
+                      <li key={`${t.de}-${t.para}`} className="flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate text-suave">
+                          <span className="text-texto">{nome(t.de)}</span> → <span className="text-texto">{nome(t.para)}</span>
+                        </span>
+                        <Valor centavos={t.valor_cents} tamanho="sm" ocultar={ocultar} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : dados.total_cents === 0 ? (
+              <Vazio compacto icone="scale" titulo="Nenhuma despesa neste mês." descricao="Quando alguém pagar algo, a conta aparece aqui." />
+            ) : (
+              <Vazio compacto icone="check" titulo="Tudo certo: ninguém deve nada." descricao="Cada um pagou exatamente a sua parte." />
+            )}
+            <div className="mt-4 flex items-baseline justify-between border-t border-borda pt-3 text-sm">
+              <span className="text-tenue">Despesas do mês</span>
+              <Valor centavos={dados.total_cents} tipo="saida" tamanho="sm" ocultar={ocultar} />
             </div>
-          </section>
+          </Cartao>
 
-          <section className="mb-4 overflow-hidden rounded-lg border border-borda bg-painel">
-            <div className="grid grid-cols-4 gap-2 border-b border-borda px-4 py-2 text-xs text-apagado">
-              <span>Membro</span>
-              <span className="text-right">Pagou</span>
-              <span className="text-right">Parte</span>
-              <span className="text-right">Saldo</span>
-            </div>
-            {dados.membros.map((m) => (
-              <div key={m.user_id} className="grid grid-cols-4 gap-2 px-4 py-2 text-sm tabular-nums">
-                <span className="truncate">{nome(m.user_id)}</span>
-                <span className="text-right">{din(m.pagou_cents)}</span>
-                <span className="text-right">{din(m.parte_cents)}</span>
-                <span className={`text-right ${m.saldo_cents < 0 ? 'text-saida' : m.saldo_cents > 0 ? 'text-entrada' : ''}`}>
-                  {m.saldo_cents > 0 ? '+' : ''}
-                  {din(m.saldo_cents)}
-                </span>
-              </div>
-            ))}
-          </section>
-        </>
+          {dados.membros.length > 0 && (
+            <section className="pt-3">
+              <TituloSecao selo="Por membro" titulo="Pagou × parte" />
+              <Cartao className="cascata mt-3 space-y-5">
+                {dados.membros.map((m) => {
+                  // Barra = quanto da conta do mês essa pessoa bancou; verde se pagou
+                  // além da parte, vermelho se ficou devendo. Sem aviso de 85%: não é limite.
+                  const pct = dados.total_cents > 0 ? (m.pagou_cents / dados.total_cents) * 100 : 0
+                  return (
+                    <div key={m.user_id}>
+                      <div className="mb-2 flex items-baseline justify-between gap-3">
+                        <span className="truncate text-sm font-medium text-texto">{nome(m.user_id)}</span>
+                        <Valor centavos={m.saldo_cents} tipo="auto" sinal tamanho="sm" ocultar={ocultar} />
+                      </div>
+                      <BarraProgresso
+                        percentual={Math.min(pct, 100)}
+                        tom={m.saldo_cents < 0 ? 'saida' : 'entrada'}
+                        avisoEm={null}
+                      />
+                      <div className="mt-1.5 flex justify-between gap-3 text-xs text-tenue">
+                        <span>
+                          pagou <Valor centavos={m.pagou_cents} tamanho="sm" ocultar={ocultar} className="text-xs text-suave" />
+                        </span>
+                        <span>
+                          parte <Valor centavos={m.parte_cents} tamanho="sm" ocultar={ocultar} className="text-xs text-suave" />
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </Cartao>
+            </section>
+          )}
+        </div>
       )}
+
+      <section className="mt-6">
+        <TituloSecao
+          selo="Divisão"
+          titulo="Proporções"
+          acao={
+            <Botao variante="secundario" tamanho="sm" onClick={() => setEditando(true)} icone={<Icone n="pencil" />}>
+              Ajustar
+            </Botao>
+          }
+        />
+        <Cartao className="mt-3">
+          <div className="flex h-2 overflow-hidden rounded-full bg-superficie-alta">
+            {/* Barra empilhada só com acento/tenue alternados: 2 pessoas é o caso comum. */}
+            {membros.map((m, i) => (
+              <div
+                key={m.user_id}
+                className={i % 2 === 0 ? 'bg-acento' : 'bg-suave'}
+                style={{ width: `${somaPesos > 0 ? (m.proporcao / somaPesos) * 100 : 0}%` }}
+              />
+            ))}
+          </div>
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {membros.map((m) => (
+              <li key={m.user_id} className="flex items-baseline gap-1.5">
+                <span className="text-texto">{nome(m.user_id)}</span>
+                <span className="font-mono text-xs text-suave">
+                  {somaPesos > 0 ? `${Math.round((m.proporcao / somaPesos) * 100)}%` : '—'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Cartao>
+      </section>
 
       <EditorProporcoes
         key={membros.map((m) => `${m.user_id}:${m.proporcao}`).join()}
+        aberto={editando}
+        aoFechar={() => setEditando(false)}
         ledgerId={orcamento.id}
         membros={membros}
         nome={nome}
         aoSalvar={() => {
+          setEditando(false)
           aoMudar()
           carregar()
         }}
@@ -116,16 +210,21 @@ export function Acerto({ orcamento, usuarioId, membros, ocultar, aoMudar }: Prop
 }
 
 function EditorProporcoes({
+  aberto,
+  aoFechar,
   ledgerId,
   membros,
   nome,
   aoSalvar,
 }: {
+  aberto: boolean
+  aoFechar: () => void
   ledgerId: string
   membros: ContextoOrcamento['membros']
   nome: (id: string) => string
   aoSalvar: () => void
 }) {
+  const toast = useToast()
   const [pesos, setPesos] = useState<Record<string, number>>(() =>
     Object.fromEntries(membros.map((m) => [m.user_id, m.proporcao])),
   )
@@ -142,6 +241,8 @@ function EditorProporcoes({
         ledgerId,
         membros.map((m) => ({ user_id: m.user_id, proporcao: pesos[m.user_id] ?? 0 })),
       )
+      vibrar('sucesso')
+      toast.mostrar('Proporções salvas')
       aoSalvar()
     } catch (e) {
       setErro((e as Error).message)
@@ -151,19 +252,34 @@ function EditorProporcoes({
   }
 
   return (
-    <section className="rounded-lg border border-borda bg-painel p-4">
-      <h3 className="text-sm font-semibold">Proporções</h3>
-      <p className="mb-3 text-xs text-apagado">Pesos: 1 e 1 é meio a meio; 2 e 1 divide em 2/3 e 1/3.</p>
-      <div className="space-y-2">
+    <Sheet
+      aberto={aberto}
+      aoFechar={aoFechar}
+      selo="Acerto"
+      titulo="Proporções"
+      rodape={
+        <>
+          <Botao variante="fantasma" className="flex-1" onClick={aoFechar}>
+            Cancelar
+          </Botao>
+          <Botao className="flex-1" carregando={salvando} disabled={!mudou || soma === 0} onClick={salvar}>
+            Salvar proporções
+          </Botao>
+        </>
+      }
+    >
+      <p className="mb-4 text-sm text-suave">Pesos: 1 e 1 é meio a meio; 2 e 1 divide em 2/3 e 1/3.</p>
+      <div className="space-y-3">
         {membros.map((m) => {
           const p = pesos[m.user_id] ?? 0
           return (
-            <label key={m.user_id} className="flex items-center gap-3 text-sm">
-              <span className="flex-1 truncate">{nome(m.user_id)}</span>
-              <span className="w-12 text-right text-xs text-apagado tabular-nums">
+            <div key={m.user_id} className="flex items-center gap-3">
+              <span className="min-w-0 flex-1 truncate text-sm text-texto">{nome(m.user_id)}</span>
+              <span className="w-10 text-right font-mono text-xs text-tenue">
                 {soma > 0 ? `${Math.round((p / soma) * 100)}%` : '—'}
               </span>
-              <input
+              <Campo
+                aria-label={`Peso de ${nome(m.user_id)}`}
                 type="number"
                 inputMode="numeric"
                 min={0}
@@ -173,21 +289,15 @@ function EditorProporcoes({
                   const v = Math.max(0, Math.min(100, Math.trunc(Number(e.target.value) || 0)))
                   setPesos((at) => ({ ...at, [m.user_id]: v }))
                 }}
-                className="w-16 rounded-md border border-borda bg-fundo px-2 py-1 text-right"
+                classeCaixa="w-20"
+                className="text-right font-mono"
               />
-            </label>
+            </div>
           )
         })}
       </div>
-      {soma === 0 && <p className="mt-2 text-xs text-saida">A soma precisa ser maior que zero.</p>}
-      {erro && <p className="mt-2 text-xs text-saida">{erro}</p>}
-      <button
-        onClick={salvar}
-        disabled={!mudou || soma === 0 || salvando}
-        className="mt-3 w-full rounded-md bg-primaria px-3 py-2 text-sm font-medium text-white disabled:opacity-40"
-      >
-        {salvando ? 'salvando…' : 'Salvar proporções'}
-      </button>
-    </section>
+      {soma === 0 && <p className="mt-3 text-xs text-perigo">A soma precisa ser maior que zero.</p>}
+      {erro && <p className="mt-3 text-xs text-perigo">{erro}</p>}
+    </Sheet>
   )
 }

@@ -1,8 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CabecalhoTela } from '@/lib/ui'
-import { Icone } from '@/lib/icones'
+import {
+  Aviso,
+  Badge,
+  BotaoIcone,
+  Botao,
+  CabecalhoTela,
+  Campo,
+  Cartao,
+  Chip,
+  EsqueletoLista,
+  FileiraChips,
+  Icone,
+  IconeCategoria,
+  LinhaLista,
+  Lista,
+  Select,
+  Sheet,
+  Selo,
+  Valor,
+  Vazio,
+} from '@/design'
 import { comAtraso, ouvirOrcamento } from '@/lib/eventos'
-import { formatar } from '@/lib/dinheiro'
 import { mapaDeMembros, nomeDoMembro } from '@/lib/membros'
 import type { ContextoOrcamento, Especie, Lancamento } from '@/lib/tipos'
 import { buscarLancamentos, type FiltroBusca } from './busca.queries'
@@ -12,9 +30,6 @@ export type Props = ContextoOrcamento
 
 const POR_PAGINA = 50
 
-const inputCls =
-  'w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-blue-500 dark:border-gray-800 dark:bg-gray-950 dark:text-white dark:focus:border-blue-400'
-const rotuloCls = 'mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400'
 
 /** Espera o usuário parar de digitar: cada tecla não vira uma requisição. */
 function useAdiado<T>(valor: T, ms = 300): T {
@@ -30,6 +45,12 @@ const ddmm = (dia: string) => {
   const [a, m, d] = dia.split('-')
   return `${d}/${m}/${a?.slice(2)}`
 }
+
+const TIPOS: Array<{ id: '' | Especie; rotulo: string }> = [
+  { id: '', rotulo: 'Tudo' },
+  { id: 'expense', rotulo: 'Saídas' },
+  { id: 'income', rotulo: 'Entradas' },
+]
 
 export function Busca({ orcamento, usuarioId, membros, categorias, ocultar }: Props) {
   const ledgerId = orcamento.id
@@ -121,8 +142,7 @@ export function Busca({ orcamento, usuarioId, membros, categorias, ocultar }: Pr
     () => (kind ? categorias.filter((c) => c.kind === kind) : categorias),
     [categorias, kind],
   )
-  const dinheiro = (c: number) => (ocultar ? 'R$ ••••' : formatar(c))
-  const qtdFiltros = [categoria, membro, kind, de, ate].filter(Boolean).length
+  const qtdFiltros = [categoria, membro, de, ate].filter(Boolean).length
 
   function limpar() {
     setTexto('')
@@ -133,160 +153,184 @@ export function Busca({ orcamento, usuarioId, membros, categorias, ocultar }: Pr
     setAte('')
   }
 
+  // Na fileira de chips só o que muda a cada toque (tipo); o resto (categoria,
+  // pessoa, período) mora num Sheet pra não empurrar os resultados pra baixo.
+  const nomeCat = categoria ? porCategoria.get(categoria)?.nome : undefined
+  const nomeMembro = membro === 'eu' ? 'eu' : membro ? nomeDoMembro(porMembro.get(membro)) : undefined
+  const periodo = de || ate ? `${de ? ddmm(de) : '…'} – ${ate ? ddmm(ate) : '…'}` : undefined
+  const temAlgo = !!texto.trim() || !!kind || qtdFiltros > 0
+
   return (
     <div>
-      <CabecalhoTela titulo="Busca" subtitulo="Ache qualquer lançamento do orçamento" />
+      <CabecalhoTela selo="Lançamentos" titulo="Busca" descricao="Ache qualquer lançamento do orçamento" />
 
-      <div className="mb-3 flex gap-2">
-        <div className="relative flex-1">
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            <Icone n="search" className="h-4 w-4" />
+      <div className="relative mb-3">
+        <span className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-tenue">
+          <Icone n="search" className="h-5 w-5" />
+        </span>
+        <Campo
+          type="search"
+          value={texto}
+          maxLength={100}
+          // O usuário veio pra buscar: teclado já aberto economiza um toque.
+          autoFocus
+          enterKeyHint="search"
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Buscar na descrição"
+          aria-label="Buscar na descrição"
+          className="min-h-12 pl-11 pr-12 text-base"
+        />
+        {texto && (
+          <span className="absolute right-0 top-1/2 -translate-y-1/2">
+            <BotaoIcone rotulo="Limpar busca" onClick={() => setTexto('')}>
+              <Icone n="x" className="h-4 w-4" />
+            </BotaoIcone>
           </span>
-          <input
-            type="search"
-            value={texto}
-            maxLength={100}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Buscar na descrição"
-            aria-label="Buscar na descrição"
-            className={`${inputCls} pl-9`}
-          />
-        </div>
-        <button
-          onClick={() => setAbertos((a) => !a)}
-          aria-expanded={abertos}
-          className="shrink-0 rounded-md border border-gray-200 px-3 text-sm text-gray-600 transition-colors hover:bg-gray-100 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          Filtros{qtdFiltros ? ` (${qtdFiltros})` : ''}
-        </button>
+        )}
       </div>
 
-      {abertos && (
-        <div className="mb-3 grid grid-cols-2 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900 sm:grid-cols-3">
-          <label>
-            <span className={rotuloCls}>Tipo</span>
-            <select
-              value={kind}
-              onChange={(e) => {
-                setKind(e.target.value as '' | Especie)
-                setCategoria('')
-              }}
-              className={inputCls}
-            >
-              <option value="">todos</option>
-              <option value="expense">saídas</option>
-              <option value="income">entradas</option>
-            </select>
-          </label>
-          <label>
-            <span className={rotuloCls}>Categoria</span>
-            <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={inputCls}>
-              <option value="">todas</option>
-              {categoriasDoTipo.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.emoji ? `${c.emoji} ` : ''}
-                  {c.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className={rotuloCls}>De quem</span>
-            <select value={membro} onChange={(e) => setMembro(e.target.value)} className={inputCls}>
-              <option value="">todos</option>
-              <option value="eu">eu</option>
-              {membros
-                .filter((m) => m.user_id !== usuarioId)
-                .map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {nomeDoMembro(m)}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            <span className={rotuloCls}>De</span>
-            <input type="date" value={de} onChange={(e) => setDe(e.target.value)} className={inputCls} />
-          </label>
-          <label>
-            <span className={rotuloCls}>Até</span>
-            <input type="date" value={ate} onChange={(e) => setAte(e.target.value)} className={inputCls} />
-          </label>
-          <div className="flex items-end">
-            <button
-              onClick={limpar}
-              className="w-full rounded-md py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-800"
-            >
-              Limpar
-            </button>
-          </div>
+      <FileiraChips className="mb-4">
+        {TIPOS.map((t) => (
+          <Chip key={t.id || 'tudo'} ativo={kind === t.id} aoTocar={() => { setKind(t.id); setCategoria('') }}>
+            {t.rotulo}
+          </Chip>
+        ))}
+        <Chip
+          ativo={qtdFiltros > 0}
+          aoTocar={() => setAbertos(true)}
+          icone={<Icone n="list" className="h-3.5 w-3.5" />}
+        >
+          Filtros{qtdFiltros ? <span className="ml-1 font-mono">{qtdFiltros}</span> : null}
+        </Chip>
+      </FileiraChips>
+
+      {qtdFiltros > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          {nomeCat && <Badge tom="acento">{nomeCat}</Badge>}
+          {nomeMembro && <Badge tom="acento">{nomeMembro}</Badge>}
+          {periodo && <Badge tom="acento" mono>{periodo}</Badge>}
+          <button type="button" onClick={limpar} className="min-h-9 px-2 text-xs font-semibold text-acento">
+            Limpar
+          </button>
         </div>
       )}
 
       {erro && (
-        <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600 dark:border-red-900 dark:bg-red-950 dark:text-red-400">
+        <Aviso className="mb-3" aoTentarDeNovo={() => void recarregar()}>
           {erro}
-        </p>
+        </Aviso>
       )}
 
-      <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Entrou</p>
-          <p className="font-semibold text-emerald-600 dark:text-emerald-400">{dinheiro(totais.entrou)}</p>
-        </div>
-        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900">
-          <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Saiu</p>
-          <p className="font-semibold text-red-600 dark:text-red-400">{dinheiro(totais.saiu)}</p>
-        </div>
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <Cartao>
+          <Selo>Entrou</Selo>
+          <Valor centavos={totais.entrou} tipo="entrada" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+        </Cartao>
+        <Cartao>
+          <Selo>Saiu</Selo>
+          <Valor centavos={totais.saiu} tipo="saida" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+        </Cartao>
       </div>
 
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-800 dark:bg-gray-900 sm:p-3">
-        {carregando ? (
-          <p className="py-8 text-center text-sm text-gray-400 dark:text-gray-500">carregando…</p>
-        ) : itens.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">Nenhum lançamento encontrado</p>
-        ) : (
-          <ul className="divide-y divide-gray-200 dark:divide-gray-800">
-            {itens.map((e) => {
-              const cat = e.category_id ? porCategoria.get(e.category_id) : undefined
-              const dono = nomeDoMembro(porMembro.get(e.paid_by ?? e.created_by), usuarioId)
-              return (
-                <li key={e.id} className="flex items-center gap-3 px-2 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-gray-800 dark:text-gray-200">
-                      {e.descricao || cat?.nome || (e.kind === 'income' ? 'Entrada' : 'Saída')}
-                    </p>
-                    <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">
-                      {ddmm(e.occurred_on)}
-                      {cat ? ` · ${cat.emoji ? `${cat.emoji} ` : ''}${cat.nome}` : ''} · {dono}
-                    </p>
-                  </div>
-                  <span
-                    className={`shrink-0 text-sm font-medium tabular-nums ${
-                      e.kind === 'income' ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-900 dark:text-white'
-                    }`}
-                  >
-                    {e.kind === 'income' ? '+' : '−'}
-                    {dinheiro(e.amount_cents)}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
+      {carregando ? (
+        <EsqueletoLista linhas={5} />
+      ) : itens.length === 0 ? (
+        <Vazio
+          icone="search"
+          titulo={temAlgo ? 'Nada bate com essa busca.' : 'Nenhum lançamento neste orçamento ainda.'}
+          descricao={temAlgo ? 'Tente uma palavra mais curta ou afrouxe os filtros.' : undefined}
+          acao={
+            temAlgo ? (
+              <Botao variante="secundario" onClick={limpar}>
+                Limpar busca e filtros
+              </Botao>
+            ) : undefined
+          }
+        />
+      ) : (
+        // Sem cascata: a lista muda a cada tecla e a animação viraria tremedeira.
+        <Lista>
+          {itens.map((e) => {
+            const cat = e.category_id ? porCategoria.get(e.category_id) : undefined
+            const dono = nomeDoMembro(porMembro.get(e.paid_by ?? e.created_by), usuarioId)
+            return (
+              <LinhaLista
+                key={e.id}
+                inicio={<IconeCategoria categoria={cat} />}
+                titulo={e.descricao || cat?.nome || (e.kind === 'income' ? 'Entrada' : 'Saída')}
+                subtitulo={
+                  <>
+                    <span className="font-mono">{ddmm(e.occurred_on)}</span>
+                    {cat && e.descricao ? ` · ${cat.nome}` : ''} · {dono}
+                  </>
+                }
+                fim={
+                  <Valor
+                    centavos={e.amount_cents}
+                    tipo={e.kind === 'income' ? 'entrada' : 'saida'}
+                    ocultar={ocultar}
+                    tamanho="sm"
+                  />
+                }
+              />
+            )
+          })}
+        </Lista>
+      )}
 
-        {proximo && !carregando && (
-          <button
-            onClick={() => void carregarMais()}
-            disabled={carregandoMais}
-            className="mt-2 w-full rounded-md py-2 text-sm font-medium text-blue-600 transition-colors hover:bg-gray-100 disabled:opacity-50 dark:text-blue-400 dark:hover:bg-gray-800"
-          >
-            {carregandoMais ? 'Carregando…' : 'Carregar mais'}
-          </button>
-        )}
-      </div>
+      {proximo && !carregando && (
+        <div className="mt-4 flex justify-center">
+          <Botao variante="fantasma" carregando={carregandoMais} onClick={() => void carregarMais()}>
+            Carregar mais
+          </Botao>
+        </div>
+      )}
 
       <AvisosDeMeta />
+
+      <Sheet
+        aberto={abertos}
+        aoFechar={() => setAbertos(false)}
+        selo="Busca"
+        titulo="Filtros"
+        rodape={
+          <>
+            <Botao variante="fantasma" className="flex-1" onClick={limpar}>
+              Limpar
+            </Botao>
+            <Botao className="flex-1" onClick={() => setAbertos(false)}>
+              Ver resultados
+            </Botao>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Select rotulo="Categoria" value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+            <option value="">todas</option>
+            {categoriasDoTipo.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.emoji ? `${c.emoji} ` : ''}
+                {c.nome}
+              </option>
+            ))}
+          </Select>
+          <Select rotulo="De quem" value={membro} onChange={(e) => setMembro(e.target.value)}>
+            <option value="">todos</option>
+            <option value="eu">eu</option>
+            {membros
+              .filter((m) => m.user_id !== usuarioId)
+              .map((m) => (
+                <option key={m.user_id} value={m.user_id}>
+                  {nomeDoMembro(m)}
+                </option>
+              ))}
+          </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <Campo rotulo="De" type="date" value={de} onChange={(e) => setDe(e.target.value)} className="font-mono" />
+            <Campo rotulo="Até" type="date" value={ate} onChange={(e) => setAte(e.target.value)} className="font-mono" />
+          </div>
+        </div>
+      </Sheet>
     </div>
   )
 }
@@ -330,23 +374,25 @@ export function AvisosDeMeta() {
   if (!estado) return null
   const podeAlternar = estado === 'ativo' || estado === 'inativo'
   return (
-    <div className="mt-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 dark:border-gray-800 dark:bg-gray-900">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+    <Cartao className="mt-6 flex items-center gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-tinta-acento text-acento">
         <Icone n="bell" className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Avisos de meta</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">{erro ?? TEXTO_ESTADO[estado]}</p>
+        <p className="text-sm font-medium text-texto">Avisos de meta</p>
+        <p className={erro ? 'text-xs text-perigo' : 'text-xs text-suave'}>{erro ?? TEXTO_ESTADO[estado]}</p>
       </div>
       {podeAlternar && (
-        <button
+        <Botao
+          tamanho="sm"
+          variante={estado === 'ativo' ? 'secundario' : 'primario'}
+          carregando={ocupado}
           onClick={() => void alternar()}
-          disabled={ocupado}
-          className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          className="shrink-0"
         >
           {estado === 'ativo' ? 'Desligar' : 'Ativar avisos'}
-        </button>
+        </Botao>
       )}
-    </div>
+    </Cartao>
   )
 }

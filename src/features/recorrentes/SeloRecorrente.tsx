@@ -1,4 +1,4 @@
-import { Icone } from '@/lib/icones'
+import { Icone, cx } from '@/design'
 
 /**
  * Marca de "veio de recorrente" pra linha de lançamento do mês. Exportado pra
@@ -10,7 +10,7 @@ export function SeloRecorrente({ className = '' }: { className?: string }) {
     <span
       title="Lançamento recorrente"
       aria-label="recorrente"
-      className={`inline-flex shrink-0 items-center text-apagado ${className}`}
+      className={cx('inline-flex shrink-0 items-center text-tenue', className)}
     >
       <Icone n="repeat" className="h-3 w-3" />
     </span>

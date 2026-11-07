@@ -2,39 +2,69 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Tokens por PAPEL, em canais "r g b" (casam com rgb(var(--x) / alpha) do
+ * tailwind.config.js). Identidade "escuro sóbrio" do fono: o ESCURO é o
+ * principal; o claro deriva dos mesmos papéis. Tela nenhuma usa cor literal —
+ * se faltar um papel, ele nasce aqui, não num className. Ver DESIGN.md.
+ */
 @layer base {
-  /* Paleta do fin-calc: azul primário, verde na entrada, vermelho na saída e uma
-     escala de cinzas neutra (mesmos hex do app Android, ui/theme/Theme.kt). Agora
-     com modo claro E escuro — o sistema decide via prefers-color-scheme.
-     Valores em canais RGB "r g b" pra casar com o rgb(var(...) / alpha) do Tailwind. */
   :root {
     color-scheme: light;
-    --fundo: 255 255 255; /* branco       — background */
-    --painel: 249 250 251; /* gray50       — surfaceVariant (cards) */
-    --painel-forte: 243 244 246; /* gray100      — estados pressionados */
-    --borda: 229 231 235; /* gray200      — outline */
-    --texto: 17 24 39; /* gray900      — onSurface */
-    --apagado: 107 114 128; /* gray500      — texto secundário */
-    --primaria: 37 99 235; /* blue600      — ação primária */
-    --saida: 239 68 68; /* red500       — despesa */
-    --entrada: 5 150 105; /* emerald600   — receita */
-    --atencao: 245 158 11; /* amber500     — aviso (ex: aguardando rede) */
+    --fundo: 244 246 249;
+    --superficie: 255 255 255;
+    --superficie-alta: 241 245 249;
+    --campo: 248 250 252;
+    --borda: 226 232 240;
+    --borda-forte: 203 213 225;
+    --texto: 15 23 42;
+    --texto-suave: 71 85 105;
+    --texto-tenue: 100 116 139;
+    /* no claro o teal desce um tom (teal-600): o #14b8a6 sobre branco não passa AA */
+    --acento: 13 148 136;
+    --acento-suave: 15 118 110;
+    --sobre-acento: 255 255 255;
+    --entrada: 5 150 105;
+    --saida: 225 29 72;
+    --atencao: 217 119 6;
+    --perigo: 220 38 38;
+    /* fundos tintados = a cor do estado a ~10% sobre a superfície (sólidos, pra
+       não somarem opacidade quando um tintado fica em cima do outro) */
+    --tinta-acento: 231 244 243;
+    --tinta-entrada: 230 245 240;
+    --tinta-saida: 252 232 237;
+    --tinta-atencao: 251 241 230;
+    --tinta-perigo: 252 233 233;
+    --sombra-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+    --sombra-flutuante: 0 12px 32px rgba(15, 23, 42, 0.14);
   }
 
-  /* Dark por CLASSE (.dark no <html>), pra o toggle mandar. Os mesmos tokens das
-     telas antigas seguem a classe; as telas novas usam gray/emerald/red direto. */
   .dark {
     color-scheme: dark;
-    --fundo: 3 7 18; /* gray950 */
-    --painel: 17 24 39; /* gray900 */
-    --painel-forte: 31 41 55; /* gray800 */
-    --borda: 31 41 55; /* gray800 */
-    --texto: 243 244 246; /* gray100 */
-    --apagado: 156 163 175; /* gray400 */
-    /* primária fica no blue600 nos dois modos: é sempre fundo de botão com texto
-       branco, e branco sobre blue600 passa AA nas duas cores de fundo. */
-    --saida: 248 113 113; /* red400 */
-    --entrada: 52 211 153; /* emerald400 */
+    --fundo: 6 9 16; /* base-950 #060910 */
+    --superficie: 15 23 42; /* base-800 #0f172a — cards */
+    --superficie-alta: 30 41 59; /* base-700 #1e293b — pressionado, chip, trilho */
+    --campo: 10 14 26; /* base-900 #0a0e1a — inputs, nav */
+    --borda: 39 46 63; /* ≈ white/10 sobre o card, mas sólido */
+    --borda-forte: 51 65 85; /* base-600 #334155 */
+    --texto: 241 245 249;
+    --texto-suave: 148 163 184;
+    --texto-tenue: 100 116 139;
+    --acento: 20 184 166; /* #14b8a6 */
+    --acento-suave: 94 234 212; /* #5eead4 */
+    --sobre-acento: 6 9 16;
+    --entrada: 52 211 153; /* #34d399 */
+    --saida: 244 63 94; /* #f43f5e */
+    --atencao: 245 158 11; /* #f59e0b */
+    --perigo: 239 68 68;
+    --tinta-acento: 16 46 59;
+    --tinta-entrada: 20 49 58;
+    --tinta-saida: 47 29 49;
+    --tinta-atencao: 47 42 38;
+    --tinta-perigo: 46 29 46;
+    /* o truque do fono: fio de luz de 1px no topo do card, sem glow */
+    --sombra-card: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    --sombra-flutuante: 0 16px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   }
 
   html,
@@ -46,19 +76,88 @@
 
   body {
     margin: 0;
-    /* Inter, igual o cashly — é boa parte do "cara" do design. */
-    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    @apply font-sans antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    /* teclado numérico colado na borda inferior do iPhone */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    padding-top: env(safe-area-inset-top, 0px);
+    text-rendering: optimizeLegibility;
     -webkit-tap-highlight-color: transparent;
+    /* sem "puxar e quicar" a página inteira; quem rola é o conteúdo.
+       Safe-area NÃO vai aqui: vai nos elementos fixos (topo, nav, rodapé de sheet). */
+    overscroll-behavior-y: none;
   }
 
-  /* o app é uma tela só, sem scroll de página: quem rola é a grade de categorias */
-  body {
-    overscroll-behavior: none;
+  ::selection {
+    @apply bg-acento/30;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--acento));
+    outline-offset: 2px;
+  }
+
+  /* valor em dinheiro alinha coluna: algarismos de largura fixa */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+}
+
+@layer components {
+  /* Cascata: filhos aparecem escalonados (~50ms) em vez de todos de uma vez.
+     Use no contêiner da lista/painéis. Depois do 10º, todos juntos — lista
+     longa não pode virar uma fila de espera. */
+  .cascata > * {
+    animation: subir 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .cascata > *:nth-child(1) { animation-delay: 0.02s; }
+  .cascata > *:nth-child(2) { animation-delay: 0.07s; }
+  .cascata > *:nth-child(3) { animation-delay: 0.12s; }
+  .cascata > *:nth-child(4) { animation-delay: 0.17s; }
+  .cascata > *:nth-child(5) { animation-delay: 0.22s; }
+  .cascata > *:nth-child(6) { animation-delay: 0.27s; }
+  .cascata > *:nth-child(7) { animation-delay: 0.32s; }
+  .cascata > *:nth-child(8) { animation-delay: 0.37s; }
+  .cascata > *:nth-child(9) { animation-delay: 0.42s; }
+  .cascata > *:nth-child(n + 10) { animation-delay: 0.45s; }
+
+  /* rolagem interna sem barra gorda (sheet, grade de categorias) */
+  .rolagem-fina {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--borda-forte)) transparent;
+    overscroll-behavior: contain;
+  }
+
+  /* placeholder de carregamento: brilho que atravessa devagar, sóbrio */
+  .esqueleto {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--superficie-alta)) 0%,
+      rgb(var(--borda)) 50%,
+      rgb(var(--superficie-alta)) 100%
+    );
+    background-size: 200% 100%;
+    animation: brilho 1.6s linear infinite;
+  }
+}
+
+/* Movimento desligado pra quem pediu. Vale pra tudo: animação, transição e o
+   Contador/BarraProgresso (que também checam a media query no JS). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

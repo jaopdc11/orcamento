@@ -1,29 +1,27 @@
-// Tema claro/escuro por CLASSE (igual o cashly: `.dark` no <html>), não por
-// media-query — assim o toggle da sidebar manda. O padrão segue o sistema até o
-// usuário escolher. Um script inline no index.html aplica antes do render pra não
-// piscar branco.
+// Tema claro/escuro por CLASSE (.dark no <html>), pra o toggle mandar.
+// O ESCURO é o padrão (identidade do app); claro só se o usuário escolher.
+// O script inline do index.html aplica a mesma regra antes do render pra não piscar.
 
 const CHAVE = 'orcamento:tema'
 export type Tema = 'claro' | 'escuro'
 
+// mesmas cores do --fundo de cada tema (barra de status do celular combina)
+const COR_BARRA: Record<Tema, string> = { escuro: '#060910', claro: '#f4f6f9' }
+
 export function temaAtual(): Tema {
   try {
-    const s = localStorage.getItem(CHAVE)
-    if (s === 'claro' || s === 'escuro') return s
+    if (localStorage.getItem(CHAVE) === 'claro') return 'claro'
   } catch {
-    /* storage bloqueado */
+    /* storage bloqueado: fica no padrão */
   }
-  const escuroDoSistema =
-    typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches
-  return escuroDoSistema ? 'escuro' : 'claro'
+  return 'escuro'
 }
 
 export function aplicarTema(t: Tema): void {
   document.documentElement.classList.toggle('dark', t === 'escuro')
-  const cor = t === 'escuro' ? '#030712' : '#ffffff'
   document
     .querySelectorAll('meta[name="theme-color"]')
-    .forEach((m) => m.setAttribute('content', cor))
+    .forEach((m) => m.setAttribute('content', COR_BARRA[t]))
 }
 
 export function alternarTema(): Tema {

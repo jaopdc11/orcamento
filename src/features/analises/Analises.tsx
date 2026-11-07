@@ -18,35 +18,33 @@ import { api } from '@/lib/api'
 import { deslocarMes, mesDe, mesPorExtenso } from '@/lib/datas'
 import { formatar } from '@/lib/dinheiro'
 import { comAtraso, ouvirOrcamento } from '@/lib/eventos'
-import { Icone } from '@/lib/icones'
 import { nomeDoMembro } from '@/lib/membros'
-import { CabecalhoTela } from '@/lib/ui'
+import {
+  Aviso,
+  BotaoIcone,
+  CabecalhoTela,
+  Cartao,
+  Chip,
+  CORES_GRAFICO,
+  Esqueleto,
+  FileiraChips,
+  Icone,
+  Selo,
+  Valor,
+  Vazio,
+  corDaCategoria, TOOLTIP_GRAFICO, TICK_GRAFICO, corDoMembro,
+} from '@/design'
 import type { AnaliseCategorias, AnaliseEvolucao, AnaliseMembros, ContextoOrcamento, Escopo } from '@/lib/tipos'
 
 export type Props = ContextoOrcamento
 
-// Paleta categórica da skill dataviz (validada em claro e escuro, ordem fixa:
-// a ordem é o que garante separação pra daltônico entre vizinhos).
-const SERIES = {
-  claro: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
-  escuro: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'],
-}
-const CINZA = { claro: '#9ca3af', escuro: '#6b7280' }
-// Até 7 fatias com cor própria; o resto vira "Outros" em vez de inventar a 9ª cor.
+// Até 7 fatias com cor própria; o resto vira "Outros" em vez de repetir cor da paleta.
 const MAX_FATIAS = 7
 const OCULTO = 'R$ ••••'
+// "Outros" e "sem categoria" ficam neutros: cor de série é só pra coisa identificável.
+const NEUTRO = 'rgb(var(--texto-tenue))'
+const PERIODOS = [3, 6, 12, 24] as const
 
-/** O tema é classe no <html>; recharts pinta via prop, então precisa saber qual é. */
-function useEscuro(): boolean {
-  const [escuro, setEscuro] = useState(() => document.documentElement.classList.contains('dark'))
-  useEffect(() => {
-    if (typeof MutationObserver === 'undefined') return
-    const obs = new MutationObserver(() => setEscuro(document.documentElement.classList.contains('dark')))
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-    return () => obs.disconnect()
-  }, [])
-  return escuro
-}
 
 type Dados = { cats: AnaliseCategorias; evo: AnaliseEvolucao; membros: AnaliseMembros }
 
@@ -95,33 +93,35 @@ function useAnalises(ledgerId: string, mes: string, meses: number, escopo: Escop
   return { dados, erro }
 }
 
-function Cartao({ titulo, children }: { titulo: string; children: ReactNode }) {
-  return (
-    <section className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-gray-900">
-      <h3 className="mb-3 text-sm font-medium text-gray-700 dark:text-gray-200">{titulo}</h3>
-      {children}
-    </section>
-  )
-}
-
-function Vazio() {
-  return <p className="py-10 text-center text-sm text-gray-400 dark:text-gray-500">nada lançado no período</p>
-}
-
 const mesCurto = (m: string) => mesPorExtenso(m).slice(0, 3) + '/' + m.slice(2, 4)
 const reaisCurto = (c: number) =>
   Math.abs(c) >= 100_000 ? `${Math.round(c / 100_000)}k` : String(Math.round(c / 100))
 
-export function Analises({ orcamento, usuarioId, membros, categorias, ocultar }: Props) {
+/** Cartão de gráfico: selo + título + conteúdo, pra todos terem a mesma cara. */
+function CartaoGrafico({ selo, titulo, extra, children }: { selo: string; titulo: ReactNode; extra?: ReactNode; children: ReactNode }) {
+  return (
+    <Cartao>
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <Selo>{selo}</Selo>
+          <h3 className="mt-1 font-display text-base font-semibold text-texto">{titulo}</h3>
+        </div>
+        {extra}
+      </div>
+      {children}
+    </Cartao>
+  )
+}
+
+function SemDados() {
+  return <Vazio compacto icone="pieChart" titulo="Nada lançado nesse período. Lança um gasto e o gráfico aparece." />
+}
+
+export function Analises({ orcamento, usuarioId, membros, ocultar }: Props) {
   const [escopo, setEscopo] = useState<Escopo>('conjunto')
   const [mes, setMes] = useState(() => mesDe())
   const [meses, setMeses] = useState(6)
   const { dados, erro } = useAnalises(orcamento.id, mes, meses, escopo)
-  const escuro = useEscuro()
-  const tema = escuro ? 'escuro' : 'claro'
-  const serie = SERIES[tema]
-  const eixo = escuro ? '#9ca3af' : '#6b7280'
-  const grade = escuro ? '#1f2937' : '#f3f4f6'
   const din = (c: number) => (ocultar ? OCULTO : formatar(c))
 
   // Se o membro escolhido saiu do orçamento, a API devolveria 400: volta pro conjunto.
@@ -129,20 +129,19 @@ export function Analises({ orcamento, usuarioId, membros, categorias, ocultar }:
     if (escopo !== 'eu' && escopo !== 'conjunto' && !membros.some((m) => m.user_id === escopo)) setEscopo('conjunto')
   }, [membros, escopo])
 
-  // Cor segue a categoria (a cor que o usuário escolheu, senão a posição dela
-  // na lista), não o ranking: trocar o escopo não repinta as fatias.
+  // Cor segue a categoria (hash estável ou cor escolhida), não o ranking:
+  // trocar o escopo/mês não repinta as fatias.
   const fatias = useMemo(() => {
     if (!dados) return []
-    const posicao = new Map(categorias.map((c, i) => [c.id, i]))
-    const itens = dados.cats.itens.map((f, i) => ({
+    const itens = dados.cats.itens.map((f) => ({
       nome: `${f.emoji ? f.emoji + ' ' : ''}${f.nome}`,
       valor: f.total_cents,
-      cor: f.cor ?? (f.category_id ? serie[(posicao.get(f.category_id) ?? i) % serie.length]! : CINZA[tema]),
+      cor: f.category_id ? corDaCategoria(f.category_id, f.cor).cor : NEUTRO,
     }))
     if (itens.length <= MAX_FATIAS + 1) return itens
     const resto = itens.slice(MAX_FATIAS).reduce((s, f) => s + f.valor, 0)
-    return [...itens.slice(0, MAX_FATIAS), { nome: 'Outros', valor: resto, cor: CINZA[tema] }]
-  }, [dados, categorias, serie, tema])
+    return [...itens.slice(0, MAX_FATIAS), { nome: 'Outros', valor: resto, cor: NEUTRO }]
+  }, [dados])
 
   // Ordem dos membros fixa (a do orçamento), pra cor de cada pessoa não mudar.
   const porMembro = useMemo(() => {
@@ -155,11 +154,11 @@ export function Analises({ orcamento, usuarioId, membros, categorias, ocultar }:
           nome: nomeDoMembro(membros.find((m) => m.user_id === g.user_id), usuarioId),
           saiu: g.saiu_cents,
           entrou: g.entrou_cents,
-          cor: i === undefined ? CINZA[tema] : serie[i % serie.length]!,
+          cor: i === undefined ? NEUTRO : corDoMembro(i),
         }
       })
       .filter((g) => g.saiu > 0)
-  }, [dados, membros, usuarioId, serie, tema])
+  }, [dados, membros, usuarioId])
 
   const evolucao = useMemo(
     () =>
@@ -167,92 +166,90 @@ export function Analises({ orcamento, usuarioId, membros, categorias, ocultar }:
     [dados],
   )
   const temEvolucao = evolucao.some((p) => p.entrou || p.saiu)
+  const totalMembros = porMembro.reduce((s, g) => s + g.saiu, 0)
 
-  const tooltip = {
-    formatter: (v: unknown) => din(Number(v)),
-    contentStyle: {
-      background: escuro ? '#111827' : '#ffffff',
-      border: `1px solid ${escuro ? '#1f2937' : '#e5e7eb'}`,
-      borderRadius: 8,
-      fontSize: 12,
-      color: escuro ? '#f3f4f6' : '#111827',
-    },
-    itemStyle: { color: escuro ? '#e5e7eb' : '#374151' },
-    labelStyle: { color: escuro ? '#9ca3af' : '#6b7280' },
-    cursor: { fill: escuro ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' },
-  }
+  const tooltip = { ...TOOLTIP_GRAFICO, formatter: (v: unknown) => din(Number(v)) }
   const eixoY = {
-    tick: { fill: eixo, fontSize: 11 },
+    tick: TICK_GRAFICO,
     tickFormatter: (c: number) => (ocultar ? '' : reaisCurto(c)),
     axisLine: false,
     tickLine: false,
     width: ocultar ? 8 : 40,
   }
-  const eixoX = { tick: { fill: eixo, fontSize: 11 }, axisLine: false, tickLine: false }
-
-  const botao =
-    'rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-200'
-  const select =
-    'rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200'
+  const eixoX = { tick: TICK_GRAFICO, axisLine: false, tickLine: false }
+  const outros = useMemo(() => membros.filter((m) => m.user_id !== usuarioId), [membros, usuarioId])
 
   return (
     <div>
-      <CabecalhoTela titulo="Análises" subtitulo="para onde vai o dinheiro" />
+      <CabecalhoTela selo={mesPorExtenso(mes)} titulo="Análises" descricao="Para onde vai o dinheiro." />
 
-      {/* Filtros numa linha só, valendo pra todos os gráficos. */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <select aria-label="Escopo" className={select} value={escopo} onChange={(e) => setEscopo(e.target.value)}>
-          <option value="conjunto">Conjunto</option>
-          <option value="eu">Eu</option>
-          {membros
-            .filter((m) => m.user_id !== usuarioId)
-            .map((m) => (
-              <option key={m.user_id} value={m.user_id}>
-                {nomeDoMembro(m)}
-              </option>
+      {/* Filtros no topo, valendo pra todos os gráficos. */}
+      <div className="mb-6 space-y-3">
+        <FileiraChips>
+          <Chip ativo={escopo === 'conjunto'} aoTocar={() => setEscopo('conjunto')}>
+            Conjunto
+          </Chip>
+          <Chip ativo={escopo === 'eu'} aoTocar={() => setEscopo('eu')}>
+            Eu
+          </Chip>
+          {outros.map((m) => (
+            <Chip key={m.user_id} ativo={escopo === m.user_id} aoTocar={() => setEscopo(m.user_id)}>
+              {nomeDoMembro(m)}
+            </Chip>
+          ))}
+        </FileiraChips>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center">
+            <BotaoIcone rotulo="Mês anterior" onClick={() => setMes((m) => deslocarMes(m, -1))}>
+              <Icone n="chevronLeft" />
+            </BotaoIcone>
+            <span className="min-w-[8.5rem] text-center text-sm font-medium capitalize text-texto">{mesPorExtenso(mes)}</span>
+            <BotaoIcone rotulo="Próximo mês" onClick={() => setMes((m) => deslocarMes(m, 1))}>
+              <Icone n="chevronRight" />
+            </BotaoIcone>
+          </div>
+          <FileiraChips>
+            {PERIODOS.map((p) => (
+              <Chip key={p} ativo={meses === p} aoTocar={() => setMeses(p)}>
+                <span className="font-mono">{p}m</span>
+              </Chip>
             ))}
-        </select>
-        <div className="flex items-center gap-1">
-          <button aria-label="Mês anterior" className={botao} onClick={() => setMes((m) => deslocarMes(m, -1))}>
-            <Icone n="chevronLeft" />
-          </button>
-          <span className="min-w-[9rem] text-center text-sm font-medium capitalize text-gray-700 dark:text-gray-200">
-            {mesPorExtenso(mes)}
-          </span>
-          <button aria-label="Próximo mês" className={botao} onClick={() => setMes((m) => deslocarMes(m, 1))}>
-            <Icone n="chevronRight" />
-          </button>
+          </FileiraChips>
         </div>
-        <select aria-label="Período da evolução" className={select} value={meses} onChange={(e) => setMeses(Number(e.target.value))}>
-          <option value={3}>3 meses</option>
-          <option value={6}>6 meses</option>
-          <option value={12}>12 meses</option>
-          <option value={24}>24 meses</option>
-        </select>
       </div>
 
-      {erro && <p className="mb-4 text-sm text-saida">{erro}</p>}
-      {!dados && !erro && <p className="text-sm text-gray-400">carregando…</p>}
+      {erro && <Aviso className="mb-4">{erro}</Aviso>}
+      {!dados && !erro && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Esqueleto key={i} className="h-64 rounded-card" />
+          ))}
+        </div>
+      )}
 
       {dados && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Cartao titulo={`Gastos por categoria · ${din(dados.cats.total_cents)}`}>
+        <div className="cascata grid gap-3 lg:grid-cols-2">
+          <CartaoGrafico
+            selo="Categorias"
+            titulo="Gastos por categoria"
+            extra={<Valor centavos={dados.cats.total_cents} tipo="saida" tamanho="lg" ocultar={ocultar} />}
+          >
             {fatias.length === 0 ? (
-              <Vazio />
+              <SemDados />
             ) : (
               <div className="flex flex-col items-center gap-4 sm:flex-row">
-                <div className="h-48 w-48 shrink-0">
+                <div className="h-44 w-44 shrink-0">
                   <ResponsiveContainer>
                     <PieChart>
                       <Pie
                         data={fatias}
                         dataKey="valor"
                         nameKey="nome"
-                        innerRadius="58%"
+                        innerRadius="62%"
                         outerRadius="100%"
-                        stroke={escuro ? '#111827' : '#ffffff'}
+                        stroke="rgb(var(--superficie))"
                         strokeWidth={2}
-                        isAnimationActive={false}
+                        animationDuration={600}
                       >
                         {fatias.map((f) => (
                           <Cell key={f.nome} fill={f.cor} />
@@ -263,89 +260,108 @@ export function Analises({ orcamento, usuarioId, membros, categorias, ocultar }:
                   </ResponsiveContainer>
                 </div>
                 {/* Legenda em lista com valor: identidade nunca só por cor, e serve de tabela. */}
-                <ul className="w-full space-y-1.5 text-sm">
+                <ul className="w-full space-y-1 text-sm">
                   {fatias.map((f) => (
-                    <li key={f.nome} className="flex items-center gap-2">
+                    <li key={f.nome} className="flex min-h-8 items-center gap-2">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: f.cor }} />
-                      <span className="truncate text-gray-700 dark:text-gray-200">{f.nome}</span>
-                      <span className="ml-auto tabular-nums text-gray-500 dark:text-gray-400">
-                        {ocultar ? OCULTO : `${Math.round((f.valor / dados.cats.total_cents) * 100)}%`}
+                      <span className="truncate text-texto">{f.nome}</span>
+                      <span className="ml-auto flex shrink-0 items-baseline gap-2">
+                        <Valor centavos={f.valor} tamanho="sm" ocultar={ocultar} className="text-suave" />
+                        <span className="w-9 text-right font-mono text-xs text-tenue">
+                          {dados.cats.total_cents > 0 ? `${Math.round((f.valor / dados.cats.total_cents) * 100)}%` : '—'}
+                        </span>
                       </span>
                     </li>
                   ))}
                 </ul>
               </div>
             )}
-          </Cartao>
+          </CartaoGrafico>
 
-          <Cartao titulo="Quem gastou quanto">
+          <CartaoGrafico selo="Membros" titulo="Quem gastou quanto">
             {porMembro.length === 0 ? (
-              <Vazio />
+              <SemDados />
             ) : (
-              <div style={{ height: Math.max(96, porMembro.length * 44) }}>
+              <ul className="space-y-3">
+                {porMembro.map((g) => (
+                  <li key={g.nome}>
+                    <div className="mb-1.5 flex items-baseline justify-between gap-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: g.cor }} />
+                        <span className="truncate text-texto">{g.nome}</span>
+                      </span>
+                      <Valor centavos={g.saiu} tamanho="sm" ocultar={ocultar} />
+                    </div>
+                    {/* Barra simples em vez de BarChart: dá pra ler o nome inteiro no celular. */}
+                    <div className="h-2 overflow-hidden rounded-full bg-superficie-alta">
+                      <div
+                        className="h-full rounded-full transition-[width] duration-700 ease-suave"
+                        style={{ width: `${totalMembros > 0 ? (g.saiu / totalMembros) * 100 : 0}%`, background: g.cor }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CartaoGrafico>
+
+          <CartaoGrafico
+            selo={`Últimos ${meses} meses`}
+            titulo="Entrou × saiu"
+            extra={
+              temEvolucao && (
+                <Legenda
+                  itens={[
+                    ['Entrou', CORES_GRAFICO.entrada],
+                    ['Saiu', CORES_GRAFICO.saida],
+                  ]}
+                />
+              )
+            }
+          >
+            {!temEvolucao ? (
+              <SemDados />
+            ) : (
+              <div className="h-56">
                 <ResponsiveContainer>
-                  <BarChart data={porMembro} layout="vertical" margin={{ left: 0, right: 8 }}>
-                    <XAxis type="number" hide />
-                    <YAxis type="category" dataKey="nome" {...eixoX} width={96} />
+                  <BarChart data={evolucao} barGap={2}>
+                    <CartesianGrid vertical={false} stroke={CORES_GRAFICO.grade} strokeDasharray="3 3" />
+                    <XAxis dataKey="mes" {...eixoX} />
+                    <YAxis {...eixoY} />
                     <Tooltip {...tooltip} />
-                    <Bar dataKey="saiu" name="Gastou" radius={[0, 4, 4, 0]} barSize={18} isAnimationActive={false}>
-                      {porMembro.map((g) => (
-                        <Cell key={g.nome} fill={g.cor} />
-                      ))}
-                    </Bar>
+                    <Bar dataKey="entrou" name="Entrou" fill={CORES_GRAFICO.entrada} radius={[6, 6, 0, 0]} maxBarSize={18} animationDuration={600} />
+                    <Bar dataKey="saiu" name="Saiu" fill={CORES_GRAFICO.saida} radius={[6, 6, 0, 0]} maxBarSize={18} animationDuration={600} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             )}
-          </Cartao>
+          </CartaoGrafico>
 
-          <Cartao titulo="Entrou × saiu">
+          <CartaoGrafico selo={`Últimos ${meses} meses`} titulo="Evolução do saldo">
             {!temEvolucao ? (
-              <Vazio />
-            ) : (
-              <>
-                <Legenda itens={[['Entrou', serie[2]!], ['Saiu', serie[1]!]]} />
-                <div className="h-56">
-                  <ResponsiveContainer>
-                    <BarChart data={evolucao} barGap={2}>
-                      <CartesianGrid vertical={false} stroke={grade} />
-                      <XAxis dataKey="mes" {...eixoX} />
-                      <YAxis {...eixoY} />
-                      <Tooltip {...tooltip} />
-                      <Bar dataKey="entrou" name="Entrou" fill={serie[2]} radius={[4, 4, 0, 0]} maxBarSize={20} isAnimationActive={false} />
-                      <Bar dataKey="saiu" name="Saiu" fill={serie[1]} radius={[4, 4, 0, 0]} maxBarSize={20} isAnimationActive={false} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </>
-            )}
-          </Cartao>
-
-          <Cartao titulo="Evolução do saldo">
-            {!temEvolucao ? (
-              <Vazio />
+              <SemDados />
             ) : (
               <div className="h-56">
                 <ResponsiveContainer>
                   <LineChart data={evolucao}>
-                    <CartesianGrid vertical={false} stroke={grade} />
+                    <CartesianGrid vertical={false} stroke={CORES_GRAFICO.grade} strokeDasharray="3 3" />
                     <XAxis dataKey="mes" {...eixoX} />
                     <YAxis {...eixoY} />
-                    <ReferenceLine y={0} stroke={eixo} strokeDasharray="3 3" />
-                    <Tooltip {...tooltip} cursor={{ stroke: eixo }} />
+                    <ReferenceLine y={0} stroke={CORES_GRAFICO.eixo} strokeDasharray="3 3" />
+                    <Tooltip {...tooltip} cursor={{ stroke: CORES_GRAFICO.eixo }} />
                     <Line
                       dataKey="saldo"
                       name="Saldo"
-                      stroke={serie[0]}
+                      stroke={CORES_GRAFICO.acento}
                       strokeWidth={2}
-                      dot={{ r: 4, fill: serie[0], stroke: escuro ? '#111827' : '#ffffff', strokeWidth: 2 }}
-                      isAnimationActive={false}
+                      dot={{ r: 3.5, fill: CORES_GRAFICO.acento, stroke: 'rgb(var(--superficie))', strokeWidth: 2 }}
+                      animationDuration={600}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             )}
-          </Cartao>
+          </CartaoGrafico>
         </div>
       )}
     </div>
@@ -354,7 +370,7 @@ export function Analises({ orcamento, usuarioId, membros, categorias, ocultar }:
 
 function Legenda({ itens }: { itens: [string, string][] }) {
   return (
-    <div className="mb-2 flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+    <div className="flex shrink-0 gap-3 text-xs text-suave">
       {itens.map(([nome, cor]) => (
         <span key={nome} className="flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: cor }} />

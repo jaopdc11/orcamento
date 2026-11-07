@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { criarOrcamento, aceitarConvite } from './orcamentos.queries'
+import { Aviso, Botao, Campo, Icone, Selo, Tabs, vibrar } from '@/design'
 
 // Primeira tela depois do login, pra quem ainda não participa de nenhum orçamento.
 // Também é a tela de "entrar num outro" mais tarde.
@@ -28,6 +29,7 @@ export function Comecar({ aoEntrar, aoCancelar }: Props) {
         aba === 'criar'
           ? await criarOrcamento(nome, apelido)
           : await aceitarConvite(codigo)
+      vibrar('sucesso')
       aoEntrar(id)
     } catch (e) {
       // as RPCs levantam mensagem em português e legível — mostre como veio.
@@ -38,83 +40,80 @@ export function Comecar({ aoEntrar, aoCancelar }: Props) {
   }
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center px-6 py-10">
-      <div className="w-full max-w-sm">
-      <h1 className="mb-6 text-2xl font-semibold">
-        {aoCancelar ? 'Outro orçamento' : 'Bora começar'}
-      </h1>
+    // Fora do shell: cuida da própria safe-area.
+    <div className="flex min-h-[100dvh] flex-col bg-fundo px-6 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(2.5rem,env(safe-area-inset-top))]">
+      <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center">
+        <div className="animate-subir">
+          <span className="mb-6 inline-flex h-12 w-12 items-center justify-center rounded-card border border-borda bg-superficie text-acento shadow-card">
+            <Icone n={aoCancelar ? 'users' : 'wallet'} className="h-6 w-6" />
+          </span>
+          <Selo tom="acento">{aoCancelar ? 'Mais um' : 'Primeiro passo'}</Selo>
+          <h1 className="mb-6 mt-1.5 font-display text-3xl font-semibold tracking-tight text-texto">
+            {aoCancelar ? 'Outro orçamento' : 'Bora começar'}
+          </h1>
+        </div>
 
-      <div className="mb-6 flex gap-1 rounded-lg border border-borda bg-painel p-1">
-        {(['criar', 'entrar'] as const).map((a) => (
-          <button
-            key={a}
-            onClick={() => {
-              setAba(a)
-              setErro(null)
-            }}
-            className={`flex-1 rounded-md py-2 text-sm font-semibold transition-colors ${
-              aba === a ? 'bg-fundo text-texto shadow-sm' : 'text-apagado'
-            }`}
-          >
-            {a === 'criar' ? 'Criar um' : 'Tenho um código'}
-          </button>
-        ))}
-      </div>
+        <Tabs
+          cheio
+          className="mb-6"
+          abas={[
+            { id: 'criar', rotulo: 'Criar um' },
+            { id: 'entrar', rotulo: 'Tenho um código' },
+          ]}
+          ativa={aba}
+          aoTrocar={(a) => {
+            setAba(a)
+            setErro(null)
+          }}
+        />
 
-      <form onSubmit={submeter} className="flex flex-col gap-3">
-        {aba === 'criar' ? (
-          <>
-            <input
+        <form key={aba} onSubmit={submeter} className="flex animate-subir flex-col gap-3">
+          {aba === 'criar' ? (
+            <>
+              <Campo
+                rotulo="Nome do orçamento"
+                required
+                autoFocus
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="ex: Nossa casa"
+              />
+              <Campo
+                rotulo="Como você aparece"
+                ajuda="Opcional. Dá pra mudar depois nas configurações."
+                value={apelido}
+                onChange={(e) => setApelido(e.target.value)}
+                placeholder="seu apelido"
+              />
+            </>
+          ) : (
+            <Campo
+              rotulo="Código de convite"
+              ajuda="O código vem de quem já está no orçamento. Vale 7 dias e serve uma vez só."
               required
               autoFocus
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome (ex: Nossa casa)"
-              className="rounded-xl border border-borda bg-painel px-4 py-3 outline-none focus:border-primaria"
+              value={codigo}
+              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
+              placeholder="ABCD-1234"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              className="min-h-14 text-center font-mono text-2xl tracking-[0.2em] sm:text-2xl"
             />
-            <input
-              value={apelido}
-              onChange={(e) => setApelido(e.target.value)}
-              placeholder="Como você aparece (opcional)"
-              className="rounded-xl border border-borda bg-painel px-4 py-3 outline-none focus:border-primaria"
-            />
-          </>
-        ) : (
-          <input
-            required
-            autoFocus
-            value={codigo}
-            onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-            placeholder="ABCD-1234"
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            className="rounded-xl border border-borda bg-painel px-4 py-3 text-center text-2xl tracking-[0.2em] outline-none focus:border-primaria"
-          />
-        )}
+          )}
 
-        <button
-          type="submit"
-          disabled={ocupado}
-          className="rounded-xl bg-primaria px-4 py-3 font-semibold text-white disabled:opacity-50"
-        >
-          {ocupado ? 'Um instante…' : aba === 'criar' ? 'Criar orçamento' : 'Entrar'}
-        </button>
+          <Botao type="submit" tamanho="lg" cheio carregando={ocupado} className="mt-2">
+            {ocupado ? 'Um instante…' : aba === 'criar' ? 'Criar orçamento' : 'Entrar'}
+          </Botao>
 
-        {aoCancelar && (
-          <button type="button" onClick={aoCancelar} className="py-2 text-sm text-apagado">
-            Voltar
-          </button>
-        )}
-      </form>
+          {aoCancelar && (
+            <Botao type="button" variante="fantasma" cheio onClick={aoCancelar}>
+              Voltar
+            </Botao>
+          )}
+        </form>
 
-      {erro && <p className="mt-4 text-sm text-saida">{erro}</p>}
-
-      {aba === 'entrar' && !erro && (
-        <p className="mt-4 text-sm text-apagado">
-          O código vem de quem já está no orçamento. Vale 7 dias e serve uma vez só.
-        </p>
-      )}
+        {erro && <Aviso className="mt-4 animate-fade">{erro}</Aviso>}
       </div>
     </div>
   )
