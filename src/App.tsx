@@ -274,7 +274,12 @@ function Raiz() {
   function conteudo() {
     switch (vista) {
       case 'inicio':
-        return <Inicio {...ctx} />
+        return (
+          <Inicio
+            {...ctx}
+            lancamentoInicial={destino?.ledgerId === atual.id && destino.lancamentoId ? { id: destino.lancamentoId, mes: destino.mes } : undefined}
+          />
+        )
       case 'mais':
         return <Mais aoIr={irPara} tema={tema} aoTrocarTema={trocarTema} aoSair={() => void sair()} />
       case 'historico':
@@ -337,7 +342,7 @@ function Raiz() {
             </Aviso>
           )}
           {/* key = vista: trocar de tela REMONTA, e a remontagem toca a entrada */}
-          <div key={vista === 'metas' ? `metas:${destino?.n ?? 0}` : vista} className="animate-subir">
+          <div key={vista === 'metas' || vista === 'inicio' ? `${vista}:${destino?.n ?? 0}` : vista} className="animate-subir">
             {conteudo()}
           </div>
         </div>

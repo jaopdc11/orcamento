@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { mesDe, mesPorExtenso } from '@/lib/datas'
 import { mapaDeMembros, nomeDoMembro } from '@/lib/membros'
 import { useMes } from '@/features/mes/useMes'
 import type { Linha } from '@/features/mes/useMes'
 import { LinhaLancamento } from '@/features/mes/Dashboard'
-import { EditarLancamento } from '@/features/lancamentos/EditarLancamento'
-import { arquivarLancamento } from '@/features/lancamentos/lancamentos.queries'
+import { EditarLancamento, type Editavel } from '@/features/lancamentos/EditarLancamento'
+import { arquivarLancamento, buscarLancamentosDoMes } from '@/features/lancamentos/lancamentos.queries'
 import {
   Aviso,
   BarraProgresso,
@@ -41,10 +41,38 @@ export type Props = ContextoOrcamento
 const PERTO_DO_LIMITE = 0.85
 const ULTIMOS = 5
 
-export function Inicio({ orcamento, categorias, membros, usuarioId, ocultar }: Props) {
+/** `lancamentoInicial`: aviso de lançamento tocado; a ficha dele abre assim que for achado. */
+export function Inicio({
+  orcamento,
+  categorias,
+  membros,
+  usuarioId,
+  ocultar,
+  lancamentoInicial,
+}: Props & { lancamentoInicial?: { id: string; mes: string } }) {
   const mes = useMemo(() => mesDe(), [])
   const { linhas, totais, porCategoria, carregando, erro, recarregar } = useMes(orcamento.id, mes, categorias)
-  const [editando, setEditando] = useState<Linha | null>(null)
+  const [editando, setEditando] = useState<Editavel | null>(null)
+  // Procura no mês aberto; se for de outro mês (lançado com data passada), busca o mês dele.
+  const [procurado, setProcurado] = useState(lancamentoInicial ?? null)
+  useEffect(() => {
+    if (!procurado || carregando) return
+    const aqui = linhas.find((l) => l.id === procurado.id && !l.pendente)
+    if (aqui) {
+      setEditando(aqui)
+      setProcurado(null)
+      return
+    }
+    setProcurado(null)
+    buscarLancamentosDoMes(orcamento.id, procurado.mes)
+      .then((lista) => {
+        const l = lista.find((x) => x.id === procurado.id)
+        if (l) setEditando(l)
+      })
+      .catch(() => {
+        /* apagado ou offline: fica no Início */
+      })
+  }, [procurado, carregando, linhas, orcamento.id])
   const compartilhado = membros.length > 1
   const [escopo, setEscopoBruto] = useState<string>(() => {
     try {

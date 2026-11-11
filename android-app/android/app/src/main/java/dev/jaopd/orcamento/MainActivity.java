@@ -74,7 +74,7 @@ public class MainActivity extends BridgeActivity {
         String url = webView.getUrl();
         if (url != null && url.startsWith(Site.URL)) {
             webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('orcamento:abrir',{detail:{ledgerId:'"
-                + ledgerId + "',mes:'" + mes + "',tela:'" + tela(intent) + "'}}))", null);
+                + ledgerId + "',mes:'" + mes + "',tela:'" + tela(intent) + "',lancamentoId:'" + lancamento(intent) + "'}}))", null);
         } else {
             webView.loadUrl(Site.URL + "/" + consultaDoAviso(intent));
         }
@@ -85,7 +85,14 @@ public class MainActivity extends BridgeActivity {
         String ledgerId = intent.getStringExtra("ledgerId");
         String mes = intent.getStringExtra("mes");
         if (!valido(ledgerId, mes)) return "";
-        return "?orcamento=" + Uri.encode(ledgerId) + "&mes=" + Uri.encode(mes) + "&tela=" + tela(intent);
+        return "?orcamento=" + Uri.encode(ledgerId) + "&mes=" + Uri.encode(mes) + "&tela=" + tela(intent)
+            + (lancamento(intent).isEmpty() ? "" : "&lancamento=" + lancamento(intent));
+    }
+
+    /** Id do lançamento do aviso, só se for UUID (entra em JS e em URL); senão vazio. */
+    private static String lancamento(Intent intent) {
+        String id = intent.getStringExtra("lancamentoId");
+        return id != null && id.matches("[0-9a-fA-F-]{36}") ? id : "";
     }
 
     /** Só dois valores possíveis: o que vier diferente de "inicio" vira "metas". */

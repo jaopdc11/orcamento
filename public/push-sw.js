@@ -30,11 +30,11 @@ self.addEventListener('notificationclick', (evento) => {
       // reaproveita a aba do app em vez de abrir outra a cada aviso; ela abre Metas no mês do aviso
       for (const c of abertas) {
         if ('focus' in c) {
-          if (d.ledgerId && d.mes) c.postMessage({ tipo: 'abrir', ledgerId: d.ledgerId, mes: d.mes, tela: d.tela })
+          if (d.ledgerId && d.mes) c.postMessage({ tipo: 'abrir', ledgerId: d.ledgerId, mes: d.mes, tela: d.tela, lancamentoId: d.lancamentoId })
           return c.focus()
         }
       }
-      const q = d.ledgerId && d.mes ? `/?orcamento=${encodeURIComponent(d.ledgerId)}&mes=${encodeURIComponent(d.mes)}&tela=${d.tela === 'inicio' ? 'inicio' : 'metas'}` : '/'
+      const q = d.ledgerId && d.mes ? `/?orcamento=${encodeURIComponent(d.ledgerId)}&mes=${encodeURIComponent(d.mes)}&tela=${d.tela === 'inicio' ? 'inicio' : 'metas'}${d.lancamentoId ? `&lancamento=${encodeURIComponent(d.lancamentoId)}` : ''}` : '/'
       return self.clients.openWindow(q)
     })(),
   )
