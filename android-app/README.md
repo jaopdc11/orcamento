@@ -20,8 +20,8 @@ code changes. Distributed as a signed APK only (no Play Store).
 1. Firebase: create an Android app with id `dev.jaopd.orcamento` and drop
    `google-services.json` in `android/app/` (git-ignored). Without it the app builds and runs,
    just without push.
-2. Server: generate a service-account key in the same Firebase project, copy it to the VPS and set
-   `FCM_CONTA_SERVICO=/path/to/key.json` in the API environment.
+2. Server: generate a service-account key in the same Firebase project and store it base64-encoded
+   on the VPS: `base64 -w0 key.json | vps env orcamento set FCM_CONTA_SERVICO_B64`.
 3. Signing: the keystore lives in the private `orcamento-api` repo (`android-keys/`); clone it
    next to this one. Without it, releases are signed with the machine's debug key and will not
    update the installed app.
