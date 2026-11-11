@@ -17,6 +17,7 @@ import { Busca } from '@/features/busca/Busca'
 import { aoMudarFila, ligarDrenagemAutomatica } from '@/lib/fila'
 import { api, avisarSessao, sair, type Usuario } from '@/lib/api'
 import { ouvirOrcamento } from '@/lib/eventos'
+import { destinoDaUrl, ouvirDestinos, type Destino } from '@/lib/destino'
 import { mapaDeMembros } from '@/lib/membros'
 import { alternarTema, temaAtual, type Tema } from '@/lib/tema'
 import { Inicio } from '@/features/inicio/Inicio'
@@ -75,6 +76,12 @@ function Raiz() {
   const [erro, setErro] = useState<string | null>(null)
   const [tema, setTema] = useState<Tema>(temaAtual())
   const [ocultar, setOcultar] = useState<boolean>(() => lerLocal(OCULTAR) === '1')
+  // Aviso de meta tocado: espera a lista de orçamentos e abre Metas no mês do aviso.
+  // `n` muda a cada aviso para remontar Metas mesmo se ela já estiver aberta.
+  const [destino, setDestino] = useState<(Destino & { n: number }) | null>(null)
+  const [pendenteDestino, setPendenteDestino] = useState<Destino | null>(() => destinoDaUrl())
+
+  useEffect(() => ouvirDestinos(setPendenteDestino), [])
 
   useEffect(() => ligarDrenagemAutomatica(), [])
   useEffect(() => aoMudarFila(setPendentes), [])
@@ -173,6 +180,19 @@ function Raiz() {
     void carregarOrcamentos()
   }, [carregarOrcamentos])
 
+  useEffect(() => {
+    if (!pendenteDestino || !orcamentos) return
+    // Orçamento de que a pessoa já saiu: ignora, fica onde está.
+    if (orcamentos.some((o) => o.id === pendenteDestino.ledgerId)) {
+      setAtualId(pendenteDestino.ledgerId)
+      setDestino((d) => ({ ...pendenteDestino, n: (d?.n ?? 0) + 1 }))
+      setVista('metas')
+      setSeletorAberto(false)
+      setLancando(false)
+    }
+    setPendenteDestino(null)
+  }, [pendenteDestino, orcamentos])
+
   const atualizarUsuario = useCallback(() => {
     api
       .get<Usuario>('/auth/eu')
@@ -260,7 +280,7 @@ function Raiz() {
       case 'busca':
         return <Busca {...ctx} />
       case 'metas':
-        return <Metas {...ctx} />
+        return <Metas {...ctx} mesInicial={destino?.ledgerId === atual.id ? destino.mes : undefined} />
       case 'analises':
         return <Analises {...ctx} />
       case 'recorrentes':
@@ -315,7 +335,7 @@ function Raiz() {
             </Aviso>
           )}
           {/* key = vista: trocar de tela REMONTA, e a remontagem toca a entrada */}
-          <div key={vista} className="animate-subir">
+          <div key={vista === 'metas' ? `metas:${destino?.n ?? 0}` : vista} className="animate-subir">
             {conteudo()}
           </div>
         </div>

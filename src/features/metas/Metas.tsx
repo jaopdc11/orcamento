@@ -46,10 +46,11 @@ type Edicao = { tipo: 'limite'; categoria: Categoria; atual: number | null } | {
 const msg = (e: unknown, padrao: string) => (e instanceof Error ? e.message : padrao)
 
 /** Metas são do orçamento inteiro: não há seletor de escopo aqui de propósito. */
-export function Metas({ orcamento, categorias, ocultar }: Props) {
+/** `mesInicial`: mês vindo de um aviso de meta tocado; sem ele, o mês corrente. */
+export function Metas({ orcamento, categorias, ocultar, mesInicial }: Props & { mesInicial?: string }) {
   const ledgerId = orcamento.id
   const toast = useToast()
-  const [mes, setMes] = useState(mesDe())
+  const [mes, setMes] = useState(() => mesInicial ?? mesDe())
   const [dados, setDados] = useState<Dados | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [edicao, setEdicao] = useState<Edicao | null>(null)

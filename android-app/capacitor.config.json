@@ -1,0 +1,19 @@
+{
+  "appId": "dev.jaopd.orcamento",
+  "appName": "Orçamento",
+  "webDir": "www",
+  "server": {
+    "cleartext": false,
+    "androidScheme": "https"
+  },
+  "loggingBehavior": "none",
+  "android": {
+    "allowMixedContent": false,
+    "appendUserAgent": "OrcamentoApp"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "disable"
+    }
+  }
+}

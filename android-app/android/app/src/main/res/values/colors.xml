@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#060910</color>
+    <color name="colorPrimaryDark">#060910</color>
+    <color name="colorAccent">#3DDC97</color>
+    <!-- Fundo atrás das barras do sistema e da tela de bloqueio: o mesmo theme-color do site. -->
+    <color name="fundo">#060910</color>
+    <color name="texto">#E8ECF4</color>
+    <color name="notificacao">#3DDC97</color>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Orçamento</string>
+    <string name="title_activity_main">Orçamento</string>
+    <string name="package_name">dev.jaopd.orcamento</string>
+    <string name="custom_url_scheme">dev.jaopd.orcamento</string>
+</resources>

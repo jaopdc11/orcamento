@@ -24,12 +24,17 @@ self.addEventListener('notificationclick', (evento) => {
   evento.notification.close()
   evento.waitUntil(
     (async () => {
+      const d = evento.notification.data || {}
       const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      // reaproveita a aba do app em vez de abrir outra a cada aviso
+      // reaproveita a aba do app em vez de abrir outra a cada aviso; ela abre Metas no mês do aviso
       for (const c of abertas) {
-        if ('focus' in c) return c.focus()
+        if ('focus' in c) {
+          if (d.ledgerId && d.mes) c.postMessage({ tipo: 'abrir', ledgerId: d.ledgerId, mes: d.mes })
+          return c.focus()
+        }
       }
-      return self.clients.openWindow('/')
+      const q = d.ledgerId && d.mes ? `/?orcamento=${encodeURIComponent(d.ledgerId)}&mes=${encodeURIComponent(d.mes)}` : '/'
+      return self.clients.openWindow(q)
     })(),
   )
 })
