@@ -74,7 +74,7 @@ public class MainActivity extends BridgeActivity {
         String url = webView.getUrl();
         if (url != null && url.startsWith(Site.URL)) {
             webView.evaluateJavascript("window.dispatchEvent(new CustomEvent('orcamento:abrir',{detail:{ledgerId:'"
-                + ledgerId + "',mes:'" + mes + "'}}))", null);
+                + ledgerId + "',mes:'" + mes + "',tela:'" + tela(intent) + "'}}))", null);
         } else {
             webView.loadUrl(Site.URL + "/" + consultaDoAviso(intent));
         }
@@ -85,7 +85,12 @@ public class MainActivity extends BridgeActivity {
         String ledgerId = intent.getStringExtra("ledgerId");
         String mes = intent.getStringExtra("mes");
         if (!valido(ledgerId, mes)) return "";
-        return "?orcamento=" + Uri.encode(ledgerId) + "&mes=" + Uri.encode(mes);
+        return "?orcamento=" + Uri.encode(ledgerId) + "&mes=" + Uri.encode(mes) + "&tela=" + tela(intent);
+    }
+
+    /** Só dois valores possíveis: o que vier diferente de "inicio" vira "metas". */
+    private static String tela(Intent intent) {
+        return "inicio".equals(intent.getStringExtra("tela")) ? "inicio" : "metas";
     }
 
     /** Os valores entram em JS e em URL: só UUID e AAAA-MM passam. */

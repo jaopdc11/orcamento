@@ -14,8 +14,9 @@ self.addEventListener('push', (evento) => {
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       data: msg.data || {},
-      // mesma tag por categoria/mês: o aviso de 100% substitui o de 80% na bandeja
-      tag: msg.title ? `meta:${msg.title}:${(msg.data && msg.data.mes) || ''}` : undefined,
+      // aviso de meta: mesma tag por categoria/mês, o de 100% substitui o de 80% na bandeja.
+      // Lançamento e recorrente não têm tag: cada um fica.
+      tag: msg.data && msg.data.tela === 'metas' ? `meta:${msg.title}:${msg.data.mes || ''}` : undefined,
     }),
   )
 })
@@ -29,11 +30,11 @@ self.addEventListener('notificationclick', (evento) => {
       // reaproveita a aba do app em vez de abrir outra a cada aviso; ela abre Metas no mês do aviso
       for (const c of abertas) {
         if ('focus' in c) {
-          if (d.ledgerId && d.mes) c.postMessage({ tipo: 'abrir', ledgerId: d.ledgerId, mes: d.mes })
+          if (d.ledgerId && d.mes) c.postMessage({ tipo: 'abrir', ledgerId: d.ledgerId, mes: d.mes, tela: d.tela })
           return c.focus()
         }
       }
-      const q = d.ledgerId && d.mes ? `/?orcamento=${encodeURIComponent(d.ledgerId)}&mes=${encodeURIComponent(d.mes)}` : '/'
+      const q = d.ledgerId && d.mes ? `/?orcamento=${encodeURIComponent(d.ledgerId)}&mes=${encodeURIComponent(d.mes)}&tela=${d.tela === 'inicio' ? 'inicio' : 'metas'}` : '/'
       return self.clients.openWindow(q)
     })(),
   )

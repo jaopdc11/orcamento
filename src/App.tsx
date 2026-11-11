@@ -76,7 +76,8 @@ function Raiz() {
   const [erro, setErro] = useState<string | null>(null)
   const [tema, setTema] = useState<Tema>(temaAtual())
   const [ocultar, setOcultar] = useState<boolean>(() => lerLocal(OCULTAR) === '1')
-  // Aviso de meta tocado: espera a lista de orçamentos e abre Metas no mês do aviso.
+  // Aviso tocado: espera a lista de orçamentos e abre a tela do aviso (Metas no mês
+  // do aviso de meta; Início para lançamento e recorrente).
   // `n` muda a cada aviso para remontar Metas mesmo se ela já estiver aberta.
   const [destino, setDestino] = useState<(Destino & { n: number }) | null>(null)
   const [pendenteDestino, setPendenteDestino] = useState<Destino | null>(() => destinoDaUrl())
@@ -186,7 +187,8 @@ function Raiz() {
     if (orcamentos.some((o) => o.id === pendenteDestino.ledgerId)) {
       setAtualId(pendenteDestino.ledgerId)
       setDestino((d) => ({ ...pendenteDestino, n: (d?.n ?? 0) + 1 }))
-      setVista('metas')
+      setVista(pendenteDestino.tela)
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
       setSeletorAberto(false)
       setLancando(false)
     }
@@ -280,7 +282,7 @@ function Raiz() {
       case 'busca':
         return <Busca {...ctx} />
       case 'metas':
-        return <Metas {...ctx} mesInicial={destino?.ledgerId === atual.id ? destino.mes : undefined} />
+        return <Metas {...ctx} mesInicial={destino?.ledgerId === atual.id && destino.tela === 'metas' ? destino.mes : undefined} />
       case 'analises':
         return <Analises {...ctx} />
       case 'recorrentes':
