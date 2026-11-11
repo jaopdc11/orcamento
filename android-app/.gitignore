@@ -7,4 +7,3 @@ android/app/release/
 *.jks
 *.apk
 android/app/google-services.json
-keys/

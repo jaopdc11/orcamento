@@ -16,9 +16,9 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Keystore próprio em ../keys (fora do git). Sem o arquivo, o release sai assinado com a
-    // chave de debug só para instalar e medir; trocar antes de distribuir.
-    def credenciais = rootProject.file("../keys/credenciais.properties")
+    // A chave fica no repo privado orcamento-api (android-keys/), clonado ao lado deste.
+    // Sem ela, o release sai com a chave de debug da máquina e não atualiza o app instalado.
+    def credenciais = rootProject.file("../../../orcamento-api/android-keys/credenciais.properties")
     signingConfigs {
         if (credenciais.exists()) {
             def p = new Properties()

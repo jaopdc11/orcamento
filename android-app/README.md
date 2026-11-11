@@ -22,7 +22,9 @@ code changes. Distributed as a signed APK only (no Play Store).
    just without push.
 2. Server: generate a service-account key in the same Firebase project, copy it to the VPS and set
    `FCM_CONTA_SERVICO=/path/to/key.json` in the API environment.
-3. Signing: `keys/` holds the keystore that signs every release (versioned on purpose, so any machine builds an APK that updates the installed one). It is a personal app for two phones; there is no store account to protect.
+3. Signing: the keystore lives in the private `orcamento-api` repo (`android-keys/`); clone it
+   next to this one. Without it, releases are signed with the machine's debug key and will not
+   update the installed app.
 
 ## Build
 
