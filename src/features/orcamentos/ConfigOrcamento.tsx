@@ -66,16 +66,19 @@ export function ConfigOrcamento({ orcamento, usuarioId, membros, aoMudar, aoSair
   }, [])
 
   return (
-    <div className="mx-auto max-w-xl">
+    <div>
       <CabecalhoTela selo={orcamento.nome} titulo="Configurações" descricao="Nome, quem participa e as categorias deste orçamento." />
       {erro && (
         <Aviso className="mb-4 animate-fade" aoTentarDeNovo={() => setErro(null)}>
           {erro}
         </Aviso>
       )}
-      <div className="cascata space-y-8">
-        <SecaoNome key={orcamento.id + orcamento.nome} {...{ orcamento, usuarioId, membros, agir, aoMudar }} />
-        <SecaoMembros {...{ orcamento, usuarioId, membros, agir, aoMudar, aoSair }} />
+      {/* largura cheia como o Início; no desktop, orçamento e membros de um lado, categorias do outro */}
+      <div className="cascata grid gap-8 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-8">
+          <SecaoNome key={orcamento.id + orcamento.nome} {...{ orcamento, usuarioId, membros, agir, aoMudar }} />
+          <SecaoMembros {...{ orcamento, usuarioId, membros, agir, aoMudar, aoSair }} />
+        </div>
         <SecaoCategorias ledgerId={orcamento.id} agir={agir} aoMudar={aoMudar} />
       </div>
     </div>
@@ -395,7 +398,17 @@ function SecaoCategorias({ ledgerId, agir, aoMudar }: { ledgerId: string; agir: 
             <LinhaLista
               key={c.id}
               inicio={<IconeCategoria categoria={c} />}
-              titulo={c.nome}
+              titulo={
+                c.sistema ? (
+                  <span className="flex items-center gap-1.5">
+                    {c.nome}
+                    <Badge>automática</Badge>
+                  </span>
+                ) : (
+                  c.nome
+                )
+              }
+              subtitulo={c.sistema ? 'Recebe só aportes, resgates e proventos' : undefined}
               aoTocar={() => setEditando(c)}
               acoes={
                 <>
@@ -410,9 +423,12 @@ function SecaoCategorias({ ledgerId, agir, aoMudar }: { ledgerId: string; agir: 
                   >
                     <span className="font-mono text-base">↓</span>
                   </BotaoIcone>
-                  <BotaoIcone rotulo={`arquivar ${c.nome}`} onClick={() => void arquivar(c, true)}>
-                    <Icone n="inbox" />
-                  </BotaoIcone>
+                  {/* a de sistema não arquiva: os investimentos lançam nela */}
+                  {!c.sistema && (
+                    <BotaoIcone rotulo={`arquivar ${c.nome}`} onClick={() => void arquivar(c, true)}>
+                      <Icone n="inbox" />
+                    </BotaoIcone>
+                  )}
                 </>
               }
             />

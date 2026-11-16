@@ -12,6 +12,8 @@ export type Categoria = {
   cor: string | null
   ordem: number
   archived_at: string | null
+  /** criada pelo sistema ('investimentos'): não aparece pra lançamento comum */
+  sistema?: string | null
 }
 
 export type Lancamento = {
@@ -291,7 +293,11 @@ export type Investimento = {
   cotacao_em: string | null
   desatualizado: boolean
   encerrado: boolean
+  /** de quem é: dono do movimento = quem pagou, senão quem lançou */
+  partes: ParteInvestimento[]
 }
+
+export type ParteInvestimento = { user_id: string; investido_cents: number; valor_cents: number }
 
 export type Pendencia = {
   id: string
@@ -314,6 +320,7 @@ export type Carteira = {
   rendimento_cents: number
   proventos_cents: number
   pendencias: Pendencia[]
+  por_membro: ParteInvestimento[]
 }
 
 export type Movimento = {
@@ -330,4 +337,9 @@ export type Movimento = {
 }
 
 export type MetaAporte = { mes: string; alvo_cents: number | null; aportado_cents: number }
-export type PontoCarteira = { dia: string; investido_cents: number; valor_cents: number }
+export type PontoCarteira = {
+  dia: string
+  investido_cents: number
+  valor_cents: number
+  por_membro: ParteInvestimento[] | null // null nas fotos antigas
+}

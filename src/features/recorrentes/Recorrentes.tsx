@@ -17,6 +17,7 @@ import {
   Selo,
   Sheet,
   Tabs,
+  TituloSecao,
   Valor,
   Vazio,
   useToast,
@@ -74,18 +75,43 @@ export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar
   const porMembro = useMemo(() => mapaDeMembros(membros), [membros])
   const porCategoria = useMemo(() => new Map(categorias.map((c) => [c.id, c])), [categorias])
 
+  // Escopo, igual ao Início: Eu / cada membro / Juntos. De quem é = quem paga;
+  // sem pagador ("o pote") só aparece em Juntos.
+  const compartilhado = membros.length > 1
+  const [escopo, setEscopoBruto] = useState<string>(() => {
+    try {
+      return localStorage.getItem(`orcamento:recorrentes-escopo:${ledgerId}`) ?? 'conjunto'
+    } catch {
+      return 'conjunto'
+    }
+  })
+  const escopoValido =
+    !compartilhado || (escopo !== 'conjunto' && !membros.some((m) => m.user_id === escopo)) ? 'conjunto' : escopo
+  function setEscopo(e: string) {
+    setEscopoBruto(e)
+    try {
+      localStorage.setItem(`orcamento:recorrentes-escopo:${ledgerId}`, e)
+    } catch {
+      /* só não lembra */
+    }
+  }
+  const doEscopo = useMemo(
+    () => (escopoValido === 'conjunto' ? (lista ?? []) : (lista ?? []).filter((r) => r.paid_by === escopoValido)),
+    [lista, escopoValido],
+  )
+
   // Ordem do calendário: a pessoa pensa "o que cai primeiro no mês".
-  const ordenada = useMemo(() => [...(lista ?? [])].sort((a, b) => a.dia_do_mes - b.dia_do_mes), [lista])
+  const ordenada = useMemo(() => [...doEscopo].sort((a, b) => a.dia_do_mes - b.dia_do_mes), [doEscopo])
 
   // Quanto já está "comprometido" todo mês: é a pergunta que faz alguém abrir esta tela.
   const totais = useMemo(() => {
-    const ativos = (lista ?? []).filter((r) => r.ativo)
+    const ativos = doEscopo.filter((r) => r.ativo)
     return {
       saida: ativos.filter((r) => r.kind === 'expense').reduce((s, r) => s + r.amount_cents, 0),
       entrada: ativos.filter((r) => r.kind === 'income').reduce((s, r) => s + r.amount_cents, 0),
       ativos: ativos.length,
     }
-  }, [lista])
+  }, [doEscopo])
 
   async function alternar(r: Recorrente) {
     try {
@@ -105,7 +131,7 @@ export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar
   )
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <CabecalhoTela
         selo="Todo mês"
         titulo="Recorrentes"
@@ -117,6 +143,19 @@ export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar
         <Aviso className="mb-4" aoTentarDeNovo={() => void recarregar()}>
           {erro}
         </Aviso>
+      )}
+
+      {compartilhado && lista && lista.length > 0 && (
+        <Tabs
+          className="mb-4 max-w-full overflow-x-auto"
+          ativa={escopoValido}
+          aoTrocar={setEscopo}
+          abas={[
+            { id: usuarioId, rotulo: 'Eu' },
+            ...membros.filter((m) => m.user_id !== usuarioId).map((m) => ({ id: m.user_id, rotulo: nomeDoMembro(m, usuarioId) })),
+            { id: 'conjunto', rotulo: 'Juntos' },
+          ]}
+        />
       )}
 
       {!lista ? (
@@ -138,20 +177,25 @@ export function Recorrentes({ orcamento, usuarioId, membros, categorias, ocultar
         <div className="space-y-6">
           <div className="cascata grid grid-cols-2 gap-3">
             <Cartao>
-              <Selo>Saídas fixas / mês</Selo>
-              <Valor centavos={totais.saida} tipo="saida" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+              <Selo className="mb-2">Saídas fixas / mês</Selo>
+              <Valor centavos={totais.saida} tipo="saida" tamanho="lg" ocultar={ocultar} />
             </Cartao>
             <Cartao>
-              <Selo>Entradas fixas / mês</Selo>
-              <Valor centavos={totais.entrada} tipo="entrada" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+              <Selo className="mb-2">Entradas fixas / mês</Selo>
+              <Valor centavos={totais.entrada} tipo="entrada" tamanho="lg" ocultar={ocultar} />
             </Cartao>
           </div>
 
           <section>
-            <Selo className="mb-2">
-              <span className="font-mono">{totais.ativos}</span> ativo{totais.ativos === 1 ? '' : 's'} ·{' '}
-              <span className="font-mono">{lista.length - totais.ativos}</span> pausado{lista.length - totais.ativos === 1 ? '' : 's'}
-            </Selo>
+            <TituloSecao
+              selo={`${totais.ativos} ativo${totais.ativos === 1 ? '' : 's'} · ${ordenada.length - totais.ativos} pausado${ordenada.length - totais.ativos === 1 ? '' : 's'}`}
+              titulo="Todo mês"
+            />
+            {ordenada.length === 0 && (
+              <Cartao>
+                <Vazio compacto icone="repeat" titulo="Nada recorrente no nome de quem você escolheu." descricao="Os que não têm pagador aparecem em Juntos." />
+              </Cartao>
+            )}
             <Lista cascata>
               {ordenada.map((r) => {
                 const cat = r.category_id ? porCategoria.get(r.category_id) : undefined
@@ -261,7 +305,7 @@ function SheetRecorrente({
     setErro(null)
   }, [aberto, atual])
 
-  const opcoes = useMemo(() => categorias.filter((c) => c.kind === kind), [categorias, kind])
+  const opcoes = useMemo(() => categorias.filter((c) => c.kind === kind && !c.sistema), [categorias, kind])
 
   async function salvar() {
     if (!descricao.trim()) return setErro('Dê um nome.')

@@ -26,6 +26,7 @@ import {
   TOOLTIP_GRAFICO,
   Valor,
   Vazio,
+  cx,
   useToast,
   vibrar,
 } from '@/design'
@@ -87,10 +88,27 @@ const INDEXADORES: { id: Indexador; rotulo: string }[] = [
 ]
 
 const PERIODOS = [
-  { dias: 30, rotulo: '30 dias' },
-  { dias: 90, rotulo: '3 meses' },
-  { dias: 365, rotulo: '1 ano' },
+  { id: '30', rotulo: '30 dias' },
+  { id: '90', rotulo: '3 meses' },
+  { id: '365', rotulo: '1 ano' },
 ] as const
+type Periodo = (typeof PERIODOS)[number]['id']
+
+/** Classe de ativo: o filtro em abas e os grupos da lista. */
+type Classe = 'renda_fixa' | 'variavel' | 'cripto' | 'outro'
+type FiltroClasse = 'tudo' | Classe
+const CLASSES: { id: Classe; rotulo: string }[] = [
+  { id: 'renda_fixa', rotulo: 'Renda fixa' },
+  { id: 'variavel', rotulo: 'Renda variável' },
+  { id: 'cripto', rotulo: 'Cripto' },
+  { id: 'outro', rotulo: 'Outros' },
+]
+function classeDe(t: TipoInvestimento): Classe {
+  if (t === 'renda_fixa') return 'renda_fixa'
+  if (t === 'cripto') return 'cripto'
+  if (t === 'outro') return 'outro'
+  return 'variavel'
+}
 
 const numero = (v: number, max = 8) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: max }).format(v)
 
@@ -139,13 +157,39 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
   const mes = mesDe()
   const [carteira, setCarteira] = useState<Carteira | null>(null)
   const [meta, setMeta] = useState<MetaAporte | null>(null)
-  const [dias, setDias] = useState<number>(90)
+  const [periodo, setPeriodo] = useState<Periodo>('90')
+  const dias = Number(periodo)
+  const [filtro, setFiltro] = useState<FiltroClasse>('tudo')
   const [evolucao, setEvolucao] = useState<PontoCarteira[] | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [criando, setCriando] = useState(false)
   const [editandoMeta, setEditandoMeta] = useState(false)
   const [ajustando, setAjustando] = useState<Pendencia | null>(null)
   const [abertoId, setAbertoId] = useState<string | null>(investimentoInicial ?? null)
+  const [abertosPessoa, setAbertosPessoa] = useState<Set<string>>(new Set())
+
+  // Escopo, igual ao Início: Eu / cada membro / Juntos. A parte de cada um vem da API
+  // (dono do movimento = quem pagou, senão quem lançou).
+  const compartilhado = membros.length > 1
+  const [escopo, setEscopoBruto] = useState<string>(() => {
+    try {
+      return localStorage.getItem(CHAVE_ESCOPO(ledgerId)) ?? 'conjunto'
+    } catch {
+      return 'conjunto'
+    }
+  })
+  const escopoValido =
+    !compartilhado || (escopo !== 'conjunto' && !membros.some((m) => m.user_id === escopo)) ? 'conjunto' : escopo
+  function setEscopo(e: string) {
+    setEscopoBruto(e)
+    try {
+      localStorage.setItem(CHAVE_ESCOPO(ledgerId), e)
+    } catch {
+      /* só não lembra */
+    }
+  }
+  const porMembroMapa = useMemo(() => mapaDeMembros(membros), [membros])
+  const nomeEscopo = escopoValido === usuarioId ? 'seu' : nomeDoMembro(porMembroMapa.get(escopoValido), usuarioId)
 
   const recarregar = useCallback(async () => {
     try {
@@ -188,11 +232,67 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
     }
   }, [ledgerId, recarregar])
 
-  const itens = useMemo(() => carteira?.itens ?? [], [carteira])
+  const todos = useMemo(() => carteira?.itens ?? [], [carteira])
+  // No escopo de uma pessoa, cada investimento aparece com a PARTE dela (e só os que ela tem).
+  const itens = useMemo(
+    () => (escopoValido === 'conjunto' ? todos : todos.flatMap((i) => (parteDe(i, escopoValido) ? [comParte(i, parteDe(i, escopoValido)!)] : []))),
+    [todos, escopoValido],
+  )
+  const totais = useMemo(() => {
+    if (!carteira) return { valor: 0, investido: 0, rendimento: 0 }
+    if (escopoValido === 'conjunto') {
+      return { valor: carteira.valor_atual_cents, investido: carteira.investido_cents, rendimento: carteira.rendimento_cents }
+    }
+    const p = (carteira.por_membro ?? []).find((x) => x.user_id === escopoValido)
+    return { valor: p?.valor_cents ?? 0, investido: p?.investido_cents ?? 0, rendimento: (p?.valor_cents ?? 0) - (p?.investido_cents ?? 0) }
+  }, [carteira, escopoValido])
+  const evolucaoEscopo = useMemo(() => {
+    if (!evolucao || escopoValido === 'conjunto') return evolucao
+    // foto antiga sem a divisão por membro fica de fora do gráfico de uma pessoa
+    return evolucao.flatMap((p) => {
+      if (!p.por_membro) return []
+      const m = p.por_membro.find((x) => x.user_id === escopoValido)
+      return [{ ...p, valor_cents: m?.valor_cents ?? 0, investido_cents: m?.investido_cents ?? 0 }]
+    })
+  }, [evolucao, escopoValido])
+  // Uma seção por membro, cada uma com os investimentos dele (expansível), como "Quem lançou o quê".
+  const pessoas = useMemo(
+    () =>
+      membros.map((m) => {
+        const t = (carteira?.por_membro ?? []).find((x) => x.user_id === m.user_id)
+        const dele = todos.filter((i) => !i.encerrado).flatMap((i) => (parteDe(i, m.user_id) ? [comParte(i, parteDe(i, m.user_id)!)] : []))
+        return { membro: m, itens: dele, valor: t?.valor_cents ?? 0, investido: t?.investido_cents ?? 0 }
+      }),
+    [membros, carteira, todos],
+  )
   const pendencias = useMemo(() => carteira?.pendencias ?? [], [carteira])
   const ativos = useMemo(() => itens.filter((i) => !i.encerrado), [itens])
   const encerrados = useMemo(() => itens.filter((i) => i.encerrado), [itens])
-  const aberto = useMemo(() => itens.find((i) => i.id === abertoId), [itens, abertoId])
+  // abas só das classes que existem na carteira (Tudo sempre)
+  const abasClasse = useMemo(
+    () => [
+      { id: 'tudo' as FiltroClasse, rotulo: 'Tudo' },
+      ...CLASSES.filter((c) => ativos.some((i) => classeDe(i.tipo) === c.id)).map((c) => ({
+        id: c.id as FiltroClasse,
+        // curtos: no celular as abas dividem a largura e 'Renda fixa' quebrava em duas linhas
+        rotulo: c.id === 'variavel' ? 'Variável' : c.id === 'renda_fixa' ? 'Fixa' : c.rotulo,
+      })),
+    ],
+    [ativos],
+  )
+  // filtro que sumiu (último ativo da classe encerrado/apagado) volta pro Tudo
+  useEffect(() => {
+    if (!abasClasse.some((a) => a.id === filtro)) setFiltro('tudo')
+  }, [abasClasse, filtro])
+  const grupos = useMemo(
+    () =>
+      CLASSES.filter((c) => filtro === 'tudo' || c.id === filtro)
+        .map((c) => ({ ...c, itens: ativos.filter((i) => classeDe(i.tipo) === c.id) }))
+        .filter((g) => g.itens.length > 0),
+    [ativos, filtro],
+  )
+  // a ficha mostra o investimento inteiro (e de quem é cada parte), não só a parte do escopo
+  const aberto = useMemo(() => todos.find((i) => i.id === abertoId), [todos, abertoId])
   const algumDesatualizado = ativos.some((i) => i.desatualizado)
 
   async function resolverPendencia(p: Pendencia, acao: 'confirmar' | 'recusar') {
@@ -261,16 +361,30 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
     />
   )
 
-  const pct = carteira ? percentual(carteira.rendimento_cents, carteira.investido_cents) : null
+  const pct = percentual(totais.rendimento, totais.investido)
+  const metaPct = meta?.alvo_cents ? (meta.aportado_cents / meta.alvo_cents) * 100 : null
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <CabecalhoTela
         selo="Carteira"
         titulo="Investimentos"
         descricao="Aporte sai do saldo do mês; o valor de hoje vem da cotação"
-        acao={itens.length > 0 ? botaoNovo : undefined}
+        acao={todos.length > 0 ? botaoNovo : undefined}
       />
+
+      {compartilhado && todos.length > 0 && (
+        <Tabs
+          className="mb-4 max-w-full overflow-x-auto"
+          ativa={escopoValido}
+          aoTrocar={setEscopo}
+          abas={[
+            { id: usuarioId, rotulo: 'Eu' },
+            ...membros.filter((m) => m.user_id !== usuarioId).map((m) => ({ id: m.user_id, rotulo: nomeDoMembro(m, usuarioId) })),
+            { id: 'conjunto', rotulo: 'Juntos' },
+          ]}
+        />
+      )}
 
       {erro && (
         <Aviso className="mb-4" aoTentarDeNovo={() => void recarregar()}>
@@ -280,7 +394,7 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
 
       {!carteira ? (
         !erro && <EsqueletoLista linhas={4} />
-      ) : itens.length === 0 ? (
+      ) : todos.length === 0 ? (
         <Cartao>
           <Vazio
             icone="trendingUp"
@@ -295,25 +409,39 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
         </Cartao>
       ) : (
         <div className="space-y-6">
-          <div className="cascata grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Cartao className="col-span-2 sm:col-span-1">
-              <Selo>Patrimônio hoje</Selo>
-              <Valor centavos={carteira.valor_atual_cents} tamanho="lg" ocultar={ocultar} animar className="mt-1 block" />
-            </Cartao>
+          <div className="cascata space-y-3">
             <Cartao>
-              <Selo>Investido</Selo>
-              <Valor centavos={carteira.investido_cents} tamanho="lg" ocultar={ocultar} className="mt-1 block" />
+              <Selo className="mb-2">{escopoValido === 'conjunto' ? 'Patrimônio hoje' : `Patrimônio hoje · ${nomeEscopo}`}</Selo>
+              <Valor key={escopoValido} centavos={totais.valor} tamanho="heroi" ocultar={ocultar} animar />
+              {metaPct !== null && escopoValido === 'conjunto' && (
+                <BarraProgresso
+                  className="mt-4"
+                  // passar da meta de investir é bom: trava em 100% pra não pintar de "estourou"
+                  percentual={Math.min(100, Math.max(0, metaPct))}
+                  tom="entrada"
+                  avisoEm={null}
+                  rotulo="da meta de aporte do mês"
+                  direita={<span className="font-mono">{ocultar ? '••' : `${numero(Math.max(0, metaPct), 0)}%`}</span>}
+                />
+              )}
             </Cartao>
-            <Cartao>
-              <Selo>Rendimento</Selo>
-              <Valor centavos={carteira.rendimento_cents} tipo="auto" tamanho="lg" ocultar={ocultar} className="mt-1 block" />
-              {pct && !ocultar && <span className="mt-0.5 block font-mono text-xs text-tenue">{pct}</span>}
-            </Cartao>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Cartao>
+                <Selo className="mb-2">Investido</Selo>
+                <Valor centavos={totais.investido} tamanho="lg" ocultar={ocultar} />
+              </Cartao>
+              <Cartao>
+                <Selo className="mb-2">Rendimento</Selo>
+                <Valor centavos={totais.rendimento} tipo="auto" tamanho="lg" ocultar={ocultar} />
+                {pct && !ocultar && <span className="mt-0.5 block font-mono text-xs text-tenue">{pct}</span>}
+              </Cartao>
+            </div>
           </div>
 
           {pendencias.length > 0 && (
             <section>
-              <TituloSecao titulo="Esperando confirmação" />
+              <TituloSecao selo="Pendências" titulo="Esperando confirmação" />
               <div className="cascata space-y-2">
                 {pendencias.map((p) => (
                   <Cartao key={p.id} className="!p-3">
@@ -357,25 +485,77 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
           )}
 
           {meta && (
-            <CartaoMeta meta={meta} ocultar={ocultar} aoEditar={() => setEditandoMeta(true)} />
+            <section>
+              <TituloSecao selo="Meta" titulo="Aporte do mês" />
+              <CartaoMeta meta={meta} ocultar={ocultar} aoEditar={() => setEditandoMeta(true)} />
+            </section>
           )}
 
-          <Cartao>
-            <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-              <div>
-                <Selo>Evolução</Selo>
-                <p className="mt-0.5 text-sm text-suave">Valor da carteira e quanto foi investido</p>
+          {compartilhado && (
+            <section>
+              <TituloSecao selo="Por pessoa" titulo="Quem investiu quanto" />
+              <div className="cascata space-y-2">
+                {pessoas.map(({ membro, itens: dele, valor, investido }) => {
+                  const abertoP = abertosPessoa.has(membro.user_id)
+                  return (
+                    <Cartao key={membro.user_id} semPadding>
+                      <button
+                        type="button"
+                        aria-expanded={abertoP}
+                        onClick={() =>
+                          setAbertosPessoa((a) => {
+                            const n = new Set(a)
+                            if (n.has(membro.user_id)) n.delete(membro.user_id)
+                            else n.add(membro.user_id)
+                            return n
+                          })
+                        }
+                        className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-superficie-alta/50"
+                      >
+                        <Icone
+                          n="chevronRight"
+                          className={cx('h-4 w-4 shrink-0 text-tenue transition-transform duration-200 ease-suave', abertoP && 'rotate-90')}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium text-texto">{nomeDoMembro(membro, usuarioId)}</span>
+                          <span className="text-xs text-tenue">
+                            <span className="font-mono">{dele.length}</span> investimento{dele.length === 1 ? '' : 's'}
+                          </span>
+                        </span>
+                        <span className="flex flex-col items-end gap-0.5">
+                          <Valor centavos={valor} tamanho="sm" ocultar={ocultar} />
+                          {investido > 0 && <Valor centavos={valor - investido} tipo="auto" tamanho="sm" ocultar={ocultar} />}
+                        </span>
+                      </button>
+                      {abertoP && (
+                        <div className="animate-subir border-t border-borda">
+                          {dele.length === 0 ? (
+                            <p className="px-4 py-4 text-sm text-tenue">Nenhum investimento no nome de {nomeDoMembro(membro, usuarioId)}.</p>
+                          ) : (
+                            <Lista semCartao>{dele.map(linha)}</Lista>
+                          )}
+                        </div>
+                      )}
+                    </Cartao>
+                  )
+                })}
               </div>
-              <FileiraChips>
-                {PERIODOS.map((p) => (
-                  <Chip key={p.dias} ativo={dias === p.dias} aoTocar={() => setDias(p.dias)}>
-                    {p.rotulo}
-                  </Chip>
-                ))}
-              </FileiraChips>
-            </div>
-            <GraficoEvolucao pontos={evolucao} ocultar={ocultar} />
-          </Cartao>
+            </section>
+          )}
+
+          <section>
+            <TituloSecao
+              selo="Evolução"
+              titulo="Carteira no tempo"
+              acao={<AbasResponsivas lado><Tabs<Periodo> abas={[...PERIODOS]} ativa={periodo} aoTrocar={setPeriodo} /></AbasResponsivas>}
+            />
+            <AbasResponsivas>
+              <Tabs<Periodo> cheio abas={[...PERIODOS]} ativa={periodo} aoTrocar={setPeriodo} />
+            </AbasResponsivas>
+            <Cartao>
+              <GraficoEvolucao pontos={evolucaoEscopo} ocultar={ocultar} />
+            </Cartao>
+          </section>
 
           {algumDesatualizado && (
             <Aviso tom="atencao">
@@ -385,22 +565,41 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
 
           {ativos.length > 0 && (
             <section>
-              <Selo className="mb-2">
-                <span className="font-mono">{ativos.length}</span> ativo{ativos.length === 1 ? '' : 's'}
-                {carteira.proventos_cents > 0 && (
-                  <>
-                    {' '}
-                    · proventos recebidos <Valor centavos={carteira.proventos_cents} tamanho="sm" ocultar={ocultar} />
-                  </>
-                )}
-              </Selo>
-              <Lista cascata>{ativos.map(linha)}</Lista>
+              <TituloSecao
+                selo={`${ativos.length} ativo${ativos.length === 1 ? '' : 's'}`}
+                titulo="Carteira"
+                acao={
+                  abasClasse.length > 2 ? (
+                    <AbasResponsivas lado>
+                      <Tabs<FiltroClasse> abas={abasClasse} ativa={filtro} aoTrocar={setFiltro} />
+                    </AbasResponsivas>
+                  ) : undefined
+                }
+              />
+              {abasClasse.length > 2 && (
+                <AbasResponsivas>
+                  <Tabs<FiltroClasse> abas={abasClasse} ativa={filtro} aoTrocar={setFiltro} />
+                </AbasResponsivas>
+              )}
+              <div key={filtro} className="cascata space-y-4">
+                {grupos.map((g) => (
+                  <section key={g.id}>
+                    <CabecaClasse rotulo={g.rotulo} itens={g.itens} ocultar={ocultar} />
+                    <Lista>{g.itens.map(linha)}</Lista>
+                  </section>
+                ))}
+              </div>
+              {carteira.proventos_cents > 0 && (
+                <p className="mt-2 text-xs text-tenue">
+                  Proventos recebidos: <Valor centavos={carteira.proventos_cents} tamanho="sm" ocultar={ocultar} className="text-xs" />
+                </p>
+              )}
             </section>
           )}
 
           {encerrados.length > 0 && (
             <section>
-              <TituloSecao titulo="Encerrados" />
+              <TituloSecao selo="Histórico" titulo="Encerrados" />
               <Lista>{encerrados.map(linha)}</Lista>
               <p className="mt-2 text-xs text-tenue">Vendidos ou resgatados por inteiro. À direita, o resultado final.</p>
             </section>
@@ -465,6 +664,39 @@ export function Investimentos({ orcamento, usuarioId, membros, ocultar, investim
   )
 }
 
+/**
+ * Abas ao lado do título no desktop (como no mês) e numa linha própria no
+ * celular, onde não cabem junto do título. A linha rola de lado se faltar espaço.
+ */
+function AbasResponsivas({ lado = false, children }: { lado?: boolean; children: React.ReactNode }) {
+  return lado ? (
+    <div className="hidden sm:block">{children}</div>
+  ) : (
+    <div className="-mt-1 mb-3 overflow-x-auto sm:hidden">{children}</div>
+  )
+}
+
+const CHAVE_ESCOPO = (ledgerId: string) => `orcamento:investimentos-escopo:${ledgerId}`
+
+function parteDe(i: Investimento, userId: string) {
+  return (i.partes ?? []).find((p) => p.user_id === userId && (p.investido_cents !== 0 || p.valor_cents !== 0)) ?? null
+}
+
+/** O investimento visto pela parte de uma pessoa (investido, valor e rendimento dela). */
+function comParte(i: Investimento, p: { investido_cents: number; valor_cents: number }): Investimento {
+  return { ...i, investido_cents: p.investido_cents, valor_atual_cents: p.valor_cents, rendimento_cents: p.valor_cents - p.investido_cents }
+}
+
+function CabecaClasse({ rotulo, itens, ocultar }: { rotulo: string; itens: Investimento[]; ocultar: boolean }) {
+  const valor = useMemo(() => itens.reduce((s, i) => s + i.valor_atual_cents, 0), [itens])
+  return (
+    <div className="mb-2 flex items-baseline justify-between px-1">
+      <span className="text-xs font-medium text-suave">{rotulo}</span>
+      <Valor centavos={valor} tamanho="sm" ocultar={ocultar} className="text-xs" />
+    </div>
+  )
+}
+
 function resumoPosicao(i: Investimento): string {
   const partes: string[] = [rotuloTipo(i.tipo)]
   if (ehMercado(i.tipo) && i.quantidade !== null) partes.push(`${numero(Number(i.quantidade))} ${unidade(i.tipo)}`)
@@ -494,7 +726,7 @@ function CartaoMeta({ meta, ocultar, aoEditar }: { meta: MetaAporte; ocultar: bo
     <Cartao>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Selo>Meta de aporte · {mesPorExtenso(meta.mes)}</Selo>
+          <Selo className="capitalize">{mesPorExtenso(meta.mes)}</Selo>
           <p className="mt-1 text-sm text-suave">
             Investido no mês: <Valor centavos={meta.aportado_cents} tamanho="sm" ocultar={ocultar} />
             {alvo !== null && (
@@ -1164,6 +1396,14 @@ function SheetDetalhe({
               </>
             )}
             {inv.tipo === 'renda_fixa' && <Info rotulo="Rende">{descricaoTaxa(inv)}</Info>}
+            {membros.length > 1 &&
+              (inv.partes ?? [])
+                .filter((p) => p.investido_cents !== 0 || p.valor_cents !== 0)
+                .map((p) => (
+                  <Info key={p.user_id} rotulo={`Parte de ${nomeDoMembro(porMembro.get(p.user_id), usuarioId)}`}>
+                    <Valor centavos={p.valor_cents} tamanho="sm" ocultar={ocultar} />
+                  </Info>
+                ))}
             {inv.recorrente && (
               <Info rotulo="Aporte recorrente">
                 <Valor centavos={inv.recorrente.amount_cents} tamanho="sm" ocultar={ocultar} />{' '}

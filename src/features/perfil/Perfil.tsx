@@ -29,7 +29,7 @@ const mensagem = (e: unknown, padrao: string) => (e instanceof Error ? e.message
 
 export function Perfil({ usuario, tema, aoMudarTema, aoAtualizar }: Props) {
   return (
-    <div className="mx-auto max-w-lg">
+    <div>
       <CabecalhoTela selo="Sua conta" titulo="Perfil" />
       <div className="cascata space-y-6">
         <Cartao className="flex items-center gap-4">
@@ -40,9 +40,13 @@ export function Perfil({ usuario, tema, aoMudarTema, aoAtualizar }: Props) {
           </div>
         </Cartao>
 
+        {/* largura cheia como o Início; no desktop, conta de um lado e aparelho/segurança do outro */}
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-6">
         <SecaoNome usuario={usuario} aoAtualizar={aoAtualizar} />
         <SecaoEmail usuario={usuario} aoAtualizar={aoAtualizar} />
-
+        </div>
+        <div className="space-y-6">
         <section>
           <TituloSecao selo="Aparência" titulo="Tema" />
           <Tabs
@@ -60,6 +64,8 @@ export function Perfil({ usuario, tema, aoMudarTema, aoAtualizar }: Props) {
         <AvisosDeMeta />
 
         <SecaoSessoes />
+        </div>
+        </div>
       </div>
     </div>
   )

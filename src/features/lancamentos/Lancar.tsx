@@ -36,7 +36,8 @@ export function Lancar({ ledgerId, categorias, usuarioId, aoLancar }: Props) {
   const refDescricao = useRef<HTMLInputElement>(null)
   const refData = useRef<HTMLInputElement>(null)
 
-  const visiveis = useMemo(() => categorias.filter((c) => c.kind === especie), [categorias, especie])
+  // a categoria de sistema (Investimentos) só recebe aporte/resgate, pela tela de Investimentos
+  const visiveis = useMemo(() => categorias.filter((c) => c.kind === especie && !c.sistema), [categorias, especie])
 
   const podeSalvar = centavos > 0 && categoriaId !== null && !salvando
   const corValor = centavos === 0 ? 'text-tenue' : especie === 'expense' ? 'text-saida' : 'text-entrada'

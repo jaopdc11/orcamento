@@ -50,7 +50,7 @@ export function EditarLancamento({ lancamento: l, categorias, membros, usuarioId
   const [apagando, setApagando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  const doTipo = useMemo(() => categorias.filter((c) => c.kind === kind), [categorias, kind])
+  const doTipo = useMemo(() => categorias.filter((c) => c.kind === kind && !c.sistema), [categorias, kind])
   const listaMembros = useMemo(() => [...membros.values()], [membros])
 
   const centavos = paraCentavos(valor)

@@ -154,19 +154,28 @@ export function Metas({ orcamento, categorias, ocultar, mesInicial }: Props & { 
   const temMes = mesPorExtenso(mes)
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div>
       <CabecalhoTela selo={temMes} titulo="Metas" descricao="Limites por categoria e quanto guardar no mês" />
 
-      {/* seletor de mês: alvos de 44px nos dois lados */}
-      <div className="mb-5 flex items-center justify-between rounded-card border border-borda bg-campo p-1">
-        <BotaoIcone rotulo="mês anterior" onClick={() => setMes(deslocarMes(mes, -1))}>
+      {/* navegador de mês igual ao do Mês: o mês no meio volta pra hoje */}
+      <Cartao semPadding className="mb-4 flex items-center justify-between p-1">
+        <BotaoIcone rotulo="Mês anterior" onClick={() => setMes(deslocarMes(mes, -1))}>
           <Icone n="chevronLeft" className="h-5 w-5" />
         </BotaoIcone>
-        <span className="text-sm font-semibold capitalize text-texto">{temMes}</span>
-        <BotaoIcone rotulo="próximo mês" onClick={() => setMes(deslocarMes(mes, 1))}>
+        <button
+          type="button"
+          onClick={() => setMes(mesDe())}
+          disabled={mes === mesDe()}
+          className="flex min-h-11 flex-1 flex-col items-center justify-center rounded-xl transition-transform active:scale-[0.97] disabled:active:scale-100"
+          aria-label="Voltar pro mês atual"
+        >
+          <span className="font-display text-lg font-semibold capitalize text-texto">{temMes}</span>
+          {mes !== mesDe() && <span className="text-[11px] text-acento">tocar pra voltar a hoje</span>}
+        </button>
+        <BotaoIcone rotulo="Próximo mês" onClick={() => setMes(deslocarMes(mes, 1))}>
           <Icone n="chevronRight" className="h-5 w-5" />
         </BotaoIcone>
-      </div>
+      </Cartao>
 
       {erro && (
         <Aviso className="mb-4" aoTentarDeNovo={() => void recarregar()}>
@@ -187,15 +196,7 @@ export function Metas({ orcamento, categorias, ocultar, mesInicial }: Props & { 
 
           <section>
             <TituloSecao
-              selo={
-                comMeta.length > 0 ? (
-                  <span className="font-mono normal-case tracking-normal">
-                    {comMeta.length} limite{comMeta.length > 1 ? 's' : ''}
-                  </span>
-                ) : (
-                  'Gastos'
-                )
-              }
+              selo={comMeta.length > 0 ? `${comMeta.length} limite${comMeta.length > 1 ? 's' : ''}` : 'Gastos'}
               titulo="Limite por categoria"
               acao={
                 <Botao variante="secundario" tamanho="sm" carregando={copiando} onClick={() => void copiar()} icone={<Icone n="repeat" className="h-4 w-4" />}>

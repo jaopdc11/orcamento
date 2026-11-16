@@ -7,7 +7,8 @@ import {
   EsqueletoLista,
   FileiraChips,
   Icone,
-  Selo,
+  Tabs,
+  TituloSecao,
   Vazio,
   cx,
   type NomeIcone,
@@ -253,27 +254,27 @@ export function Historico({ orcamento, usuarioId, membros, categorias, ocultar }
     <div>
       <CabecalhoTela selo="Atividade" titulo="Histórico" descricao="Quem fez o quê neste orçamento" />
 
-      <div className="mb-4 space-y-2">
-        <FileiraChips>
-          {FAMILIAS.map((f) => (
-            <Chip key={f.id || 'tudo'} ativo={filtroFamilia === f.id} aoTocar={() => setFiltroFamilia(f.id)}>
-              {f.rotulo}
-            </Chip>
-          ))}
-        </FileiraChips>
-        {membros.length > 1 && (
-          <FileiraChips>
-            <Chip ativo={!filtroMembro} aoTocar={() => setFiltroMembro('')} icone={<Icone n="users" className="h-3.5 w-3.5" />}>
-              Todos
-            </Chip>
-            {membros.map((m) => (
-              <Chip key={m.user_id} ativo={filtroMembro === m.user_id} aoTocar={() => setFiltroMembro(m.user_id)}>
-                {nomeDoMembro(m, usuarioId)}
-              </Chip>
-            ))}
-          </FileiraChips>
-        )}
-      </div>
+      {membros.length > 1 && (
+        <Tabs
+          className="mb-4 max-w-full overflow-x-auto"
+          ativa={filtroMembro || 'todos'}
+          aoTrocar={(id) => setFiltroMembro(id === 'todos' ? '' : id)}
+          abas={[
+            { id: usuarioId, rotulo: 'Eu' },
+            ...membros.filter((m) => m.user_id !== usuarioId).map((m) => ({ id: m.user_id, rotulo: nomeDoMembro(m, usuarioId) })),
+            { id: 'todos', rotulo: 'Juntos' },
+          ]}
+        />
+      )}
+
+      <TituloSecao selo="Feed" titulo="O que mudou" />
+      <FileiraChips className="mb-4">
+        {FAMILIAS.map((f) => (
+          <Chip key={f.id || 'tudo'} ativo={filtroFamilia === f.id} aoTocar={() => setFiltroFamilia(f.id)}>
+            {f.rotulo}
+          </Chip>
+        ))}
+      </FileiraChips>
 
       {erro && (
         <Aviso className="mb-4" aoTentarDeNovo={() => void recarregar()}>
@@ -309,8 +310,10 @@ export function Historico({ orcamento, usuarioId, membros, categorias, ocultar }
           {grupos.map((g) => (
             <section key={g.dia}>
               <div className="mb-2 flex items-baseline justify-between px-1">
-                <Selo>{rotuloDoDia(g.dia)}</Selo>
-                <span className="font-mono text-[11px] text-tenue">{g.itens.length}</span>
+                <span className="text-xs font-medium text-suave">{rotuloDoDia(g.dia)}</span>
+                <span className="font-mono text-xs text-tenue">
+                  {g.itens.length} {g.itens.length === 1 ? 'evento' : 'eventos'}
+                </span>
               </div>
               <ul className="divide-y divide-borda overflow-hidden rounded-card border border-borda bg-superficie shadow-card">
                 {g.itens.map((a) => {
