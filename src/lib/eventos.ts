@@ -20,6 +20,7 @@ export type TipoEvento =
   | 'orcamento'
   | 'economia'
   | 'recorrentes'
+  | 'investimentos'
 type Ouvinte = (tipo: TipoEvento) => void
 
 const canais = new Map<string, { fonte: EventSource; ouvintes: Set<Ouvinte> }>()

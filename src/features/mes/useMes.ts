@@ -19,6 +19,7 @@ export type Linha = {
   created_by: string
   updated_by: string | null // autoria da última edição (F1)
   recurring_id: string | null // gerado por recorrente (F7)
+  investment_id: string | null // aporte/resgate de investimento
   pendente: boolean
 }
 
@@ -43,6 +44,7 @@ function daFila(l: LancamentoNovo): Linha {
     created_by: l.created_by,
     updated_by: null,
     recurring_id: null, // a fila só tem o que a pessoa lançou à mão
+    investment_id: null,
     pendente: true,
   }
 }

@@ -47,6 +47,12 @@ const FRASE: Record<TipoAtividade, { verbo: string; icone: NomeIcone }> = {
   'recorrente.criado': { verbo: 'criou o recorrente', icone: 'repeat' },
   'recorrente.editado': { verbo: 'editou o recorrente', icone: 'repeat' },
   'recorrente.removido': { verbo: 'removeu o recorrente', icone: 'repeat' },
+  'investimento.criado': { verbo: 'criou o investimento', icone: 'trendingUp' },
+  'investimento.editado': { verbo: 'editou o investimento', icone: 'trendingUp' },
+  'investimento.removido': { verbo: 'removeu o investimento', icone: 'trendingUp' },
+  'investimento.aporte': { verbo: 'aportou', icone: 'trendingUp' },
+  'investimento.resgate': { verbo: 'resgatou', icone: 'trendingDown' },
+  'investimento.movimento_apagado': { verbo: 'apagou a movimentação', icone: 'trash' },
 }
 
 // O resumo vem pronto do servidor com o valor dentro ("Saída de R$ 40,00 em
@@ -55,12 +61,13 @@ const VALOR = /-?R\$\s?[\d.]+,\d{2}/g
 const esconder = (txt: string, ocultar: boolean) => (ocultar ? txt.replace(VALOR, 'R$ ••••') : txt)
 
 /** Família de atividade: dá o filtro por tipo e a tinta do ícone. */
-type Familia = 'lancamento' | 'meta' | 'categoria' | 'recorrente' | 'pessoas'
+type Familia = 'lancamento' | 'meta' | 'categoria' | 'recorrente' | 'investimento' | 'pessoas'
 const familia = (t: string): Familia => {
   if (t.startsWith('lancamento')) return 'lancamento'
   if (t.startsWith('meta') || t.startsWith('economia')) return 'meta'
   if (t.startsWith('categoria')) return 'categoria'
   if (t.startsWith('recorrente')) return 'recorrente'
+  if (t.startsWith('investimento')) return 'investimento'
   return 'pessoas' // membro, convite, orçamento: quem está no grupo e como ele se chama
 }
 const FAMILIAS: Array<{ id: Familia | ''; rotulo: string }> = [
@@ -69,6 +76,7 @@ const FAMILIAS: Array<{ id: Familia | ''; rotulo: string }> = [
   { id: 'meta', rotulo: 'Metas' },
   { id: 'categoria', rotulo: 'Categorias' },
   { id: 'recorrente', rotulo: 'Recorrentes' },
+  { id: 'investimento', rotulo: 'Investimentos' },
   { id: 'pessoas', rotulo: 'Pessoas' },
 ]
 

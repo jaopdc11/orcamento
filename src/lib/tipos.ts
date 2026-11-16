@@ -31,6 +31,7 @@ export type Lancamento = {
   deleted_at: string | null
   deleted_by: string | null
   recurring_id: string | null // gerado por recorrente (F7)
+  investment_id: string | null // aporte/resgate: só muda pela tela de Investimentos
 }
 
 /** O que a fila guarda e o que o insert manda. Sem as colunas geradas pelo banco. */
@@ -121,6 +122,12 @@ export type TipoAtividade =
   | 'recorrente.criado'
   | 'recorrente.editado'
   | 'recorrente.removido'
+  | 'investimento.criado'
+  | 'investimento.editado'
+  | 'investimento.removido'
+  | 'investimento.aporte'
+  | 'investimento.resgate'
+  | 'investimento.movimento_apagado'
 
 export type EntidadeAtividade =
   | 'orcamento'
@@ -253,3 +260,48 @@ export type ResultadoBusca = {
 }
 
 export type ChavePublica = { chave: string | null }
+
+// Investimentos (contrato: orcamento-api/docs/CONTRATO.md, seção "Investimentos")
+
+export type TipoInvestimento = 'acao' | 'fii' | 'etf' | 'cripto' | 'renda_fixa' | 'outro'
+export type Indexador = 'cdi' | 'selic' | 'prefixado'
+
+export type Investimento = {
+  id: string
+  ledger_id: string
+  nome: string
+  tipo: TipoInvestimento
+  ticker: string | null // B3 ('PETR4') ou id da CoinGecko ('bitcoin')
+  indexador: Indexador | null
+  taxa: number | null // centésimos: 11000 = 110% do CDI; prefixado 1250 = 12,5% a.a.
+  arquivado: boolean
+  created_by: string
+  created_at: string
+  quantidade: string | null // decimal em texto
+  investido_cents: number
+  valor_atual_cents: number
+  rendimento_cents: number
+  cotacao: number | null // reais por unidade
+  cotacao_em: string | null
+  desatualizado: boolean
+}
+
+export type Carteira = {
+  itens: Investimento[]
+  investido_cents: number
+  valor_atual_cents: number
+  rendimento_cents: number
+}
+
+export type Movimento = {
+  id: string
+  investment_id: string
+  tipo: 'aporte' | 'resgate'
+  amount_cents: number
+  quantidade: string | null
+  occurred_on: string
+  entry_id: string
+  paid_by: string | null
+  created_by: string
+  created_at: string
+}

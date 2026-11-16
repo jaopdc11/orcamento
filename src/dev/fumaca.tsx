@@ -68,6 +68,7 @@ const { Metas } = await import('../features/metas/Metas')
 const { Analises } = await import('../features/analises/Analises')
 const { Perfil } = await import('../features/perfil/Perfil')
 const { Recorrentes } = await import('../features/recorrentes/Recorrentes')
+const { Investimentos } = await import('../features/investimentos/Investimentos')
 const { Busca } = await import('../features/busca/Busca')
 const { Inicio } = await import('../features/inicio/Inicio')
 const { Mais } = await import('../shell/Mais')
@@ -183,7 +184,7 @@ await montar('início vazio não quebra', createElement(Inicio, CTX), ['Início'
 await montar(
   'mais lista as telas',
   createElement(Mais, { aoIr: nada, tema: 'escuro', aoTrocarTema: nada, aoSair: nada }),
-  ['Metas', 'Recorrentes', 'Histórico', 'Busca', 'Configurações', 'Perfil'],
+  ['Metas', 'Recorrentes', 'Investimentos', 'Histórico', 'Busca', 'Configurações', 'Perfil'],
 )
 await montar(
   'nav inferior',
@@ -205,6 +206,7 @@ await montar('busca', createElement(Busca, CTX), ['Busca'])
 await montar('metas', createElement(Metas, CTX), ['Metas'])
 await montar('análises', createElement(Analises, CTX), ['Análises'])
 await montar('recorrentes', createElement(Recorrentes, CTX), ['Recorrentes'])
+await montar('investimentos', createElement(Investimentos, CTX), ['Investimentos'])
 await montar(
   'configurações',
   createElement(ConfigOrcamento, { ...CTX, aoMudar: nada, aoSair: nada }),

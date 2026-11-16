@@ -13,6 +13,7 @@ import { Metas } from '@/features/metas/Metas'
 import { Analises } from '@/features/analises/Analises'
 import { Perfil } from '@/features/perfil/Perfil'
 import { Recorrentes } from '@/features/recorrentes/Recorrentes'
+import { Investimentos } from '@/features/investimentos/Investimentos'
 import { Busca } from '@/features/busca/Busca'
 import { aoMudarFila, ligarDrenagemAutomatica } from '@/lib/fila'
 import { api, avisarSessao, sair, type Usuario } from '@/lib/api'
@@ -292,6 +293,8 @@ function Raiz() {
         return <Analises {...ctx} />
       case 'recorrentes':
         return <Recorrentes {...ctx} />
+      case 'investimentos':
+        return <Investimentos {...ctx} />
       case 'config':
         return <ConfigOrcamento {...ctx} aoMudar={recarregarOrcamentoAtual} aoSair={saiuDoAtual} />
       case 'perfil':
