@@ -14,6 +14,7 @@ import { Analises } from '@/features/analises/Analises'
 import { Perfil } from '@/features/perfil/Perfil'
 import { Recorrentes } from '@/features/recorrentes/Recorrentes'
 import { Investimentos } from '@/features/investimentos/Investimentos'
+import { EVENTO_ABRIR_INVESTIMENTO } from '@/features/investimentos/SeloInvestimento'
 import { Busca } from '@/features/busca/Busca'
 import { aoMudarFila, ligarDrenagemAutomatica } from '@/lib/fila'
 import { api, avisarSessao, sair, type Usuario } from '@/lib/api'
@@ -84,6 +85,19 @@ function Raiz() {
   const [pendenteDestino, setPendenteDestino] = useState<Destino | null>(() => destinoDaUrl())
 
   useEffect(() => ouvirDestinos(setPendenteDestino), [])
+
+  // Toque num aporte/resgate no mês: abre a ficha do investimento.
+  const [investimentoAberto, setInvestimentoAberto] = useState<{ id: string; n: number } | null>(null)
+  useEffect(() => {
+    const abrir = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail
+      setInvestimentoAberto((a) => ({ id, n: (a?.n ?? 0) + 1 }))
+      setVista('investimentos')
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0 })
+    }
+    window.addEventListener(EVENTO_ABRIR_INVESTIMENTO, abrir)
+    return () => window.removeEventListener(EVENTO_ABRIR_INVESTIMENTO, abrir)
+  }, [])
 
   useEffect(() => ligarDrenagemAutomatica(), [])
   useEffect(() => aoMudarFila(setPendentes), [])
@@ -294,7 +308,7 @@ function Raiz() {
       case 'recorrentes':
         return <Recorrentes {...ctx} />
       case 'investimentos':
-        return <Investimentos {...ctx} />
+        return <Investimentos {...ctx} investimentoInicial={investimentoAberto?.id} />
       case 'config':
         return <ConfigOrcamento {...ctx} aoMudar={recarregarOrcamentoAtual} aoSair={saiuDoAtual} />
       case 'perfil':
@@ -345,7 +359,16 @@ function Raiz() {
             </Aviso>
           )}
           {/* key = vista: trocar de tela REMONTA, e a remontagem toca a entrada */}
-          <div key={vista === 'metas' || vista === 'inicio' ? `${vista}:${destino?.n ?? 0}` : vista} className="animate-subir">
+          <div
+            key={
+              vista === 'metas' || vista === 'inicio'
+                ? `${vista}:${destino?.n ?? 0}`
+                : vista === 'investimentos'
+                  ? `${vista}:${investimentoAberto?.n ?? 0}`
+                  : vista
+            }
+            className="animate-subir"
+          >
             {conteudo()}
           </div>
         </div>

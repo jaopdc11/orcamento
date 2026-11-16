@@ -5,7 +5,7 @@ import { arquivarLancamento } from '@/features/lancamentos/lancamentos.queries'
 import { nomeDoMembro } from '@/lib/membros'
 import { EditarLancamento } from '@/features/lancamentos/EditarLancamento'
 import { SeloRecorrente } from '@/features/recorrentes/SeloRecorrente'
-import { SeloInvestimento } from '@/features/investimentos/SeloInvestimento'
+import { SeloInvestimento, abrirInvestimento } from '@/features/investimentos/SeloInvestimento'
 import {
   Aviso,
   Badge,
@@ -323,8 +323,8 @@ export function LinhaLancamento({
         </span>
       }
       fim={<Valor centavos={linha.amount_cents} tipo={linha.kind === 'income' ? 'entrada' : 'saida'} ocultar={ocultar} />}
-      // aporte/resgate só muda pela tela de Investimentos (a API recusa com 409)
-      aoTocar={linha.investment_id ? undefined : aoTocar}
+      // aporte/resgate só muda pela tela de Investimentos (a API recusa com 409): o toque abre lá
+      aoTocar={linha.investment_id ? () => abrirInvestimento(linha.investment_id!) : aoTocar}
       apagada={linha.pendente}
     />
   )

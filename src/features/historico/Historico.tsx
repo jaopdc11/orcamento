@@ -53,6 +53,10 @@ const FRASE: Record<TipoAtividade, { verbo: string; icone: NomeIcone }> = {
   'investimento.aporte': { verbo: 'aportou', icone: 'trendingUp' },
   'investimento.resgate': { verbo: 'resgatou', icone: 'trendingDown' },
   'investimento.movimento_apagado': { verbo: 'apagou a movimentação', icone: 'trash' },
+  'investimento.provento': { verbo: 'confirmou o provento', icone: 'trendingUp' },
+  'investimento.pendencia_recusada': { verbo: 'descartou', icone: 'trendingUp' },
+  'investimento.meta': { verbo: 'definiu a meta de aporte', icone: 'target' },
+  'investimento.meta_removida': { verbo: 'removeu a meta de aporte', icone: 'target' },
 }
 
 // O resumo vem pronto do servidor com o valor dentro ("Saída de R$ 40,00 em

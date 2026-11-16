@@ -128,6 +128,10 @@ export type TipoAtividade =
   | 'investimento.aporte'
   | 'investimento.resgate'
   | 'investimento.movimento_apagado'
+  | 'investimento.provento'
+  | 'investimento.pendencia_recusada'
+  | 'investimento.meta'
+  | 'investimento.meta_removida'
 
 export type EntidadeAtividade =
   | 'orcamento'
@@ -264,7 +268,8 @@ export type ChavePublica = { chave: string | null }
 // Investimentos (contrato: orcamento-api/docs/CONTRATO.md, seção "Investimentos")
 
 export type TipoInvestimento = 'acao' | 'fii' | 'etf' | 'cripto' | 'renda_fixa' | 'outro'
-export type Indexador = 'cdi' | 'selic' | 'prefixado'
+export type Indexador = 'cdi' | 'selic' | 'ipca' | 'prefixado'
+export type RecorrenteInvestimento = { amount_cents: number; dia_do_mes: number; paid_by: string | null }
 
 export type Investimento = {
   id: string
@@ -273,17 +278,33 @@ export type Investimento = {
   tipo: TipoInvestimento
   ticker: string | null // B3 ('PETR4') ou id da CoinGecko ('bitcoin')
   indexador: Indexador | null
-  taxa: number | null // centésimos: 11000 = 110% do CDI; prefixado 1250 = 12,5% a.a.
-  arquivado: boolean
+  taxa: number | null // centésimos: 11000 = 110% do CDI; ipca/prefixado 650 = 6,5% a.a.
+  recorrente: RecorrenteInvestimento | null
   created_by: string
   created_at: string
   quantidade: string | null // decimal em texto
   investido_cents: number
   valor_atual_cents: number
   rendimento_cents: number
+  proventos_cents: number
   cotacao: number | null // reais por unidade
   cotacao_em: string | null
   desatualizado: boolean
+  encerrado: boolean
+}
+
+export type Pendencia = {
+  id: string
+  investment_id: string
+  investimento: string
+  ticker: string | null
+  tipo: 'provento' | 'aporte_recorrente'
+  dia: string
+  amount_cents: number
+  quantidade: string | null
+  unitario: number | null
+  rotulo: string | null
+  estado: 'pendente' | 'confirmada' | 'recusada'
 }
 
 export type Carteira = {
@@ -291,6 +312,8 @@ export type Carteira = {
   investido_cents: number
   valor_atual_cents: number
   rendimento_cents: number
+  proventos_cents: number
+  pendencias: Pendencia[]
 }
 
 export type Movimento = {
@@ -305,3 +328,6 @@ export type Movimento = {
   created_by: string
   created_at: string
 }
+
+export type MetaAporte = { mes: string; alvo_cents: number | null; aportado_cents: number }
+export type PontoCarteira = { dia: string; investido_cents: number; valor_cents: number }

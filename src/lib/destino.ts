@@ -5,9 +5,10 @@
 // - mensagem do service worker (Web Push com o app já aberto numa aba);
 // - evento `orcamento:abrir` disparado pelo app Android com o site já carregado.
 
-export type Tela = 'metas' | 'inicio'
-/** `lancamentoId`: aviso de um lançamento só; o Início abre a ficha dele. */
-export type Destino = { ledgerId: string; mes: string; tela: Tela; lancamentoId?: string }
+export type Tela = 'metas' | 'inicio' | 'investimentos'
+/** `lancamentoId`: aviso de um lançamento só; o Início abre a ficha dele.
+ *  `investimentoId`: toque num aporte no mês; Investimentos abre a ficha dele. */
+export type Destino = { ledgerId: string; mes: string; tela: Tela; lancamentoId?: string; investimentoId?: string }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MES = /^\d{4}-(0[1-9]|1[0-2])$/
@@ -17,7 +18,7 @@ export function destinoValido(d: unknown): Destino | null {
   const { ledgerId, mes, tela, lancamentoId } = d as Record<string, unknown>
   if (typeof ledgerId !== 'string' || !UUID.test(ledgerId) || typeof mes !== 'string' || !MES.test(mes)) return null
   // aviso antigo (sem tela) era sempre de meta
-  const t: Tela = tela === 'inicio' ? 'inicio' : 'metas'
+  const t: Tela = tela === 'inicio' ? 'inicio' : tela === 'investimentos' ? 'investimentos' : 'metas'
   return typeof lancamentoId === 'string' && UUID.test(lancamentoId) && t === 'inicio'
     ? { ledgerId, mes, tela: t, lancamentoId }
     : { ledgerId, mes, tela: t }
